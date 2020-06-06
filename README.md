@@ -8,13 +8,14 @@ INSTALLATION:
    Just put in in your scriptfiles folder.
 
 
-Credits::
+
+CREDITS:
 
 Name,	Work
 
 Tec9 Scripting, Main Developer
 
-SA-MP Team	Creator of the GTA:SA based Multiplayer
+SA-MP Team	Creator of San Andreas Multiplayer
 
 Emmet_	sscanf2 
 
