@@ -19,29 +19,6 @@ main()
 	print("----------------------------------\n");
 }
 
-// MySQL Define
-/*
-#define MYSQL_HOST    "web1059.s4y-web.de"      //IP Adresse des MySQL Servers
-#define MYSQL_USER    "1059_daluft"           //Benutzername der angemeldet wird
-#define MYSQL_PASS    "4}I0*cHt"               //Passwort des Benutzers
-#define MYSQL_DBSE    "1059_luftschlacht"        //Name der Datenbank*/
-
-/*
-#define MYSQL_HOST    "87.98.243.201"      //IP Adresse des MySQL Servers
-#define MYSQL_USER    "samp6840"           //Benutzername der angemeldet wird
-#define MYSQL_PASS    "haerb90"               //Passwort des Benutzers
-#define MYSQL_DBSE    "samp6840_wambo"        //Name der Datenbank*/
-
-
-/*
-#define MYSQL_HOST    "5.135.112.210"      //IP Adresse des MySQL Servers
-#define MYSQL_USER    "samp6933"           //Benutzername der angemeldet wird
-#define MYSQL_PASS    "dbsys252"               //Passwort des Benutzers
-#define MYSQL_DBSE    "samp6933_shorttest"        //Name der Datenbank*/
-
-
-
-
 
 //
 
@@ -96,7 +73,7 @@ new Float:SFSpawns[][] =
 };
 
 
-new Float:LSEnemySpawn[][] = // F¸r SF
+new Float:LSEnemySpawn[][] = // F√ºr SF
 {
     {152.5197,-1773.9719,4.3996,267.8873}, //
     {152.5520,-1784.4281,4.1189,269.7672}, //
@@ -111,7 +88,7 @@ new Float:LSEnemySpawn[][] = // F¸r SF
 };
 
 
-new Float:SFEnemySpawn[][] = // F¸r LS
+new Float:SFEnemySpawn[][] = // F√ºr LS
 {
     {-216.8717,-1474.3345,7.6936,69.4167}, //
     {-227.4613,-1480.6742,6.2603,64.7166}, //
@@ -845,7 +822,7 @@ public CheckAirWinners()
      	CreateCaptureFlag();
        	SetTimer("SpawnEveryOne",10000,0);
        	Server[EtappenWinner]=gewinner;
-       	SendClientMessageToAll(-1,"Es wurde best‰tigt");
+       	SendClientMessageToAll(-1,"Es wurde best√§tigt");
        	return 1;
 	}*/
 	return 1;
@@ -929,7 +906,7 @@ stock CreateCaptureFlag()
 }
 stock BurnAllPlanes()
 {
-    for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich groﬂ LOL!
+    for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich gro√ü LOL!
     {
         if(i!=INVALID_VEHICLE_ID)
         {
@@ -942,7 +919,7 @@ stock BurnAllPlanes()
 }
 stock DestroyAllPlanes()
 {
-    for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich groﬂ LOL!
+    for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich gro√ü LOL!
     {
         if(i!=INVALID_VEHICLE_ID)
         {
@@ -959,7 +936,7 @@ stock GetFreePlane(playerid)
     new
     color1,
     color2;
-    for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich groﬂ LOL!
+    for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich gro√ü LOL!
     {
         if(i!=INVALID_VEHICLE_ID)
         {
@@ -1218,7 +1195,7 @@ stock GetCarFunctionNew(vehicle)
 			}
 		}
 	}
-	return 0; // oder 255 musste abfrage ‰ndern
+	return 0; // oder 255 musste abfrage √§ndern
 	
 }
 
@@ -1337,7 +1314,7 @@ public OnVehicleDeath(vehicleid, killerid)
 //		SetPlayerHealth(playerid,0);
 		new team = GetPlayerTeam(playerid);
 		new teamenemy = GetEnemy(team);
-//	    SCM(playerid,-1,"Du bist der t‰ter");
+//	    SCM(playerid,-1,"Du bist der t√§ter");
 		if(killerid == INVALID_PLAYER_ID)
 		{
 			if(IsTeamMate(playerid))
@@ -1728,7 +1705,7 @@ public OnUserRegister(playerid)
 forward OnUserLogin(playerid);
 public OnUserLogin(playerid)
 {
-	//Query wurde ausgef¸hrt und das Ergebnis im Cache gespeichert
+	//Query wurde ausgef√ºhrt und das Ergebnis im Cache gespeichert
 	new rows;
 	cache_get_row_count(rows);
 	if(rows == 0)
@@ -1738,7 +1715,7 @@ public OnUserLogin(playerid)
 	}
 	else
 	{
-		//Es existiert ein Ergebnis, das heiﬂt der Spieler hat das richtige Passwort eingegeben
+		//Es existiert ein Ergebnis, das hei√üt der Spieler hat das richtige Passwort eingegeben
 		//Wir lesen nun die erste Zeile des Caches aus (ID 0)
  		cache_get_value_name_int(0, "p_id", PlayerInfo[playerid][p_id]);
 		cache_get_value_name_int(0, "score", PlayerInfo[playerid][pScore]);
@@ -1757,7 +1734,7 @@ public OnUserLogin(playerid)
 forward OnUserCheck(playerid);
 public OnUserCheck(playerid)
 {
-	//Query wurde ausgef¸hrt und das Ergebnis im Cache gespeichert
+	//Query wurde ausgef√ºhrt und das Ergebnis im Cache gespeichert
 	new rows;
 	cache_get_row_count(rows);
 	if(rows == 0)
@@ -1767,7 +1744,7 @@ public OnUserCheck(playerid)
 	}
 	else
 	{
-		//Es existiert ein Ergebnis, das heiﬂt der Spieler ist registriert und muss sich einloggen
+		//Es existiert ein Ergebnis, das hei√üt der Spieler ist registriert und muss sich einloggen
 		ShowPlayerDialog(playerid, DIALOG_LOGIN, DIALOG_STYLE_PASSWORD, "Login", "Please login:", "Login", "Cancel");
 	}
 	return 1;
@@ -1821,10 +1798,10 @@ stock MySQL_SetupConnection(ttl = 3)
 
 	handle = mysql_connect(MYSQL_HOST, MYSQL_USER, MYSQL_PASS, MYSQL_DBSE);
 
-	//Pr¸fen und gegebenenfalls wiederholen
+	//Pr√ºfen und gegebenenfalls wiederholen
 	if(mysql_errno(handle) != 0)
 	{
-		//Fehler im Verbindungsaufbau, pr¸fe ob ein weiterer Versuch gestartet werden soll
+		//Fehler im Verbindungsaufbau, pr√ºfe ob ein weiterer Versuch gestartet werden soll
 		if(ttl > 1)
 		{
 			//Versuche erneut eine Verbindung aufzubauen
@@ -1834,9 +1811,9 @@ stock MySQL_SetupConnection(ttl = 3)
 		}
 		else
 		{
-			//Abbrechen und Server schlieﬂen
+			//Abbrechen und Server schlie√üen
 			print("[MySQL] Es konnte keine Verbindung zur Datenbank hergestellt werden.");
-			print("[MySQL] Bitte pr¸fen Sie die Verbindungsdaten.");
+			print("[MySQL] Bitte pr√ºfen Sie die Verbindungsdaten.");
 			print("[MySQL] Der Server wird heruntergefahren.");
 			return SendRconCommand("exit");
 		}
@@ -1952,7 +1929,7 @@ public OnUserBanCheck(playerid)
 		SCM(playerid,COLOR_LIGHTRED,string);
 	    format(string,sizeof(string),"Ban Date: {FFFFFF}%s",BannerDate);
 		SCM(playerid,COLOR_LIGHTRED,string);
-		if(BanEver == 0) // verwirrend eig steht das f¸r NICHT permanent gebannt der name klingt aber geil hshahahahahahah wollte es net wd ‰ndern kb nvm.
+		if(BanEver == 0) // verwirrend eig steht das f√ºr NICHT permanent gebannt der name klingt aber geil hshahahahahahah wollte es net wd √§ndern kb nvm.
 		{
 			if(BanExpire >=1)
 			{
@@ -2518,7 +2495,7 @@ public UpdateGameMode()
 	                format(string,sizeof(string),"[END] The Attackers %s captured $d/4 Checkpoints and Won the Round!",GetTeamName(stepwinner),Stadt[stepwinner][Captured]);
 	                SendClientMessageToAll(COLOR_GREEN,string);
 	                SetTimer("Restart",9000,0);
-	                // bis 3/4 keine Sorge man hat etwas wie punktez‰nlung und teamriviltIt‰t am ende
+	                // bis 3/4 keine Sorge man hat etwas wie punktez√§nlung und teamriviltIt√§t am ende
 	            }
 	            else
 	            {
@@ -2529,7 +2506,7 @@ public UpdateGameMode()
 	                KillTimer(updater);
 	                Server[Prepared]=false;
 	                SetTimer("NewRound",9000,0);
-	                // bis 3/4 keine Sorge man hat etwas wie punktez‰nlung und teamriviltIt‰t am ende
+	                // bis 3/4 keine Sorge man hat etwas wie punktez√§nlung und teamriviltIt√§t am ende
 	            }
 	            // Ende
 	            return 1;
@@ -2566,7 +2543,7 @@ public UpdateGameMode()
 		                format(string,sizeof(string),"[END] The Attackers %s captured %d/4 Checkpoints and Won the Round!",GetTeamName(stepwinner),Stadt[stepwinner][Captured]);
 		                SendClientMessageToAll(COLOR_GREEN,string);
 		                SetTimer("Restart",9000,0);
-		                // bis 3/4 keine Sorge man hat etwas wie punktez‰nlung und teamriviltIt‰t am ende
+		                // bis 3/4 keine Sorge man hat etwas wie punktez√§nlung und teamriviltIt√§t am ende
 		            }
 		            else
 		            {
@@ -2577,7 +2554,7 @@ public UpdateGameMode()
 		                KillTimer(updater);
 		                Server[Prepared]=false;
 		                SetTimer("NewRound",9000,0);
-		                // bis 3/4 keine Sorge man hat etwas wie punktez‰nlung und teamriviltIt‰t am ende
+		                // bis 3/4 keine Sorge man hat etwas wie punktez√§nlung und teamriviltIt√§t am ende
 		            }
 		            return 1;
 		        }
@@ -2610,7 +2587,7 @@ public UpdateGameMode()
 						SendClientMessageToAll(COLOR_GREEN,string);
 						Stadt[Capture[cpidd][tdefender]][Defended]++;
 					}
-					if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) == GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))  // if wert == 1 return 1; Kampf um 10 sek verl‰ngern?
+					if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) == GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))  // if wert == 1 return 1; Kampf um 10 sek verl√§ngern?
 				    {
 				        // Gebiet gleichstand
 						format(string,sizeof(string),"[CAPTURE] Team %s successfully defended their Zone!",GetTeamName(Capture[cpidd][tdefender]));
@@ -2803,7 +2780,7 @@ public ProgressEnd(playerid,cpidd)
 			format(string,sizeof(string),"[CAPTURE] Team %s successfully defended their Zone!",GetTeamName(Capture[cpidd][tattacker]));
 			SendClientMessageToAll(0xFFFFFFAA,string);
 		}
-		if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) == GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))  // if wert == 1 return 1; Kampf um 10 sek verl‰ngern?
+		if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) == GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))  // if wert == 1 return 1; Kampf um 10 sek verl√§ngern?
 	    {
 	        // Gebiet gleichstand
 			format(string,sizeof(string),"[CAPTURE] Team %s successfully defended their Zone!",GetTeamName(Capture[cpidd][tattacker]));
@@ -3386,7 +3363,7 @@ public OnDynamicObjectMoved(objectid)
 
 	  		CreateExplosion(ObjPosX,ObjPosY,ObjPosZ,0,30.0);
 
-	    //	printf("Object %d ZERST÷RT",objectid);
+	    //	printf("Object %d ZERST√ñRT",objectid);
 			DestroyDynamicObject(objectid);
 			
 			BombSystem[i][bombid] = -1;
