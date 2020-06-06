@@ -12,7 +12,7 @@ Credits::
 
 Name,	Work
 
-Tec9 Scripting, Main Developer
+Tec9 Scripting, Main Developer\n
 SA-MP Team	Creator of the GTA:SA based Multiplayer
 Emmet_	sscanf2 
 Kalcor	MapAndreas
