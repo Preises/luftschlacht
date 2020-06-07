@@ -12,12 +12,18 @@
 #include <mapandreas>
 
 #include <mysql_info>
+
 main()
 {
 	print("\n----------------------------------");
 	print(" Blank Gamemode by your name here");
 	print("----------------------------------\n");
 }
+
+// MySQL Define
+
+
+
 
 
 //
@@ -73,7 +79,7 @@ new Float:SFSpawns[][] =
 };
 
 
-new Float:LSEnemySpawn[][] = // F√ºr SF
+new Float:LSEnemySpawn[][] = // F¸r SF
 {
     {152.5197,-1773.9719,4.3996,267.8873}, //
     {152.5520,-1784.4281,4.1189,269.7672}, //
@@ -88,7 +94,7 @@ new Float:LSEnemySpawn[][] = // F√ºr SF
 };
 
 
-new Float:SFEnemySpawn[][] = // F√ºr LS
+new Float:SFEnemySpawn[][] = // F¸r LS
 {
     {-216.8717,-1474.3345,7.6936,69.4167}, //
     {-227.4613,-1480.6742,6.2603,64.7166}, //
@@ -312,7 +318,7 @@ public OnGameModeInit()
 	    BombSystem[i][bombid] = -1;
 	}
 	
-	
+
 	AddPlayerClass(61,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
 	AddPlayerClass(12,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
 	AddPlayerClass(65,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
@@ -439,10 +445,15 @@ public OnPlayerRequestClass(playerid, classid)
 	return 1;
 }
 
+
+
 public OnPlayerConnect(playerid)
 {
     ResetPlayerVariables(playerid);
+    
     CheckUserBan(playerid);
+    
+    RemoveBuildingsForPlayer(playerid);
     PlayerInfo[playerid][pProgress] = CreatePlayerProgressBar(playerid, 291.333435, 208.251922, 80.5,  10.2, COLOR_LIGHTRED, 100.0);
     if(!PlayerInfo[playerid][pLoggedIn])
 	{
@@ -475,6 +486,8 @@ public OnPlayerConnect(playerid)
 	PlayerTextDrawSetProportional(playerid, TeamCapturePoints[playerid], 1);
 	return 1;
 }
+
+
 
 public OnPlayerDisconnect(playerid, reason)
 {
@@ -757,7 +770,12 @@ stock GetMostPlanes()
 	else if(Stadt[1][LuftFlugzeuge] < Stadt[2][LuftFlugzeuge]) return 2;
 	else return 999;
 }
-
+stock RemoveBuildingsForPlayer(playerid)
+{
+	RemoveBuildingForPlayer(playerid,791,-54.83594,-1201.0547,0.21875,63.015308);
+	printf("Alright");
+	return 1;
+}
 stock GetLuftUberlegenHeit()
 {
 	if(Stadt[1][LuftMacht] > Stadt[2][LuftMacht]) return 1;
@@ -822,7 +840,7 @@ public CheckAirWinners()
      	CreateCaptureFlag();
        	SetTimer("SpawnEveryOne",10000,0);
        	Server[EtappenWinner]=gewinner;
-       	SendClientMessageToAll(-1,"Es wurde best√§tigt");
+       	SendClientMessageToAll(-1,"Es wurde best‰tigt");
        	return 1;
 	}*/
 	return 1;
@@ -906,7 +924,7 @@ stock CreateCaptureFlag()
 }
 stock BurnAllPlanes()
 {
-    for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich gro√ü LOL!
+    for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich groﬂ LOL!
     {
         if(i!=INVALID_VEHICLE_ID)
         {
@@ -919,7 +937,7 @@ stock BurnAllPlanes()
 }
 stock DestroyAllPlanes()
 {
-    for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich gro√ü LOL!
+    for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich groﬂ LOL!
     {
         if(i!=INVALID_VEHICLE_ID)
         {
@@ -936,7 +954,7 @@ stock GetFreePlane(playerid)
     new
     color1,
     color2;
-    for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich gro√ü LOL!
+    for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich groﬂ LOL!
     {
         if(i!=INVALID_VEHICLE_ID)
         {
@@ -1149,7 +1167,31 @@ stock PrepareGameMode()
 	VehicleInfo[22][teamidd]= 2;
 	VehicleInfo[23][teamidd]= 2;
 	VehicleInfo[24][teamidd]= 2;
+	
+	
+	
+	// LS Barracks + Panzer
+	
+	
+	VehicleInfo[25][LocalID] = AddStaticVehicle(433,463.5969,-1813.2545,5.9832,269.5406,77,77);
+    VehicleInfo[26][LocalID] = AddStaticVehicle(433,414.2048,-1824.7388,5.5945,359.3375,77,77); // barrack2LS
+    VehicleInfo[27][LocalID] = AddStaticVehicle(433,460.2543,-1831.6183,5.2234,4.9846,77,77); // barrack3LS
+	
+    VehicleInfo[25][teamidd]= 1;
+	VehicleInfo[26][teamidd]= 1;
+	VehicleInfo[27][teamidd]= 1;
+	
+	
+	
+	// SF Barracks + Panzer
     
+    VehicleInfo[28][LocalID] = AddStaticVehicle(433,-86.2795,-1223.4944,3.0817,81.3939,77,77); // barrack1SF
+    VehicleInfo[29][LocalID] = AddStaticVehicle(433,-89.0194,-1259.2354,2.2377,103.5382,77,77); // barrack2SF
+    VehicleInfo[30][LocalID] = AddStaticVehicle(433,-109.6278,-1203.6272,3.3013,76.1915,77,77); // barrack3SF
+
+    VehicleInfo[28][teamidd]= 2;
+	VehicleInfo[29][teamidd]= 2;
+	VehicleInfo[30][teamidd]= 2;
     
 
     
@@ -1195,7 +1237,7 @@ stock GetCarFunctionNew(vehicle)
 			}
 		}
 	}
-	return 0; // oder 255 musste abfrage √§ndern
+	return 0; // oder 255 musste abfrage ‰ndern
 	
 }
 
@@ -1314,7 +1356,7 @@ public OnVehicleDeath(vehicleid, killerid)
 //		SetPlayerHealth(playerid,0);
 		new team = GetPlayerTeam(playerid);
 		new teamenemy = GetEnemy(team);
-//	    SCM(playerid,-1,"Du bist der t√§ter");
+//	    SCM(playerid,-1,"Du bist der t‰ter");
 		if(killerid == INVALID_PLAYER_ID)
 		{
 			if(IsTeamMate(playerid))
@@ -1387,7 +1429,7 @@ public OnPlayerStateChange(playerid, newstate, oldstate)
 		    LastDriver[GetPlayerVehicleID(playerid)] = playerid;
 		    LastCar[playerid] = GetPlayerVehicleID(playerid);
 		}
-	}
+	}/*
 	if(oldstate == PLAYER_STATE_DRIVER && newstate == PLAYER_STATE_ONFOOT)
 	{
 		if(LastCar[playerid]!=INVALID_VEHICLE_ID)
@@ -1404,7 +1446,7 @@ public OnPlayerStateChange(playerid, newstate, oldstate)
 			//	SpawnPlayer(playerid);
 			}
 		}
-	}
+	}*/
 	return 1;
 }
 
@@ -1705,7 +1747,7 @@ public OnUserRegister(playerid)
 forward OnUserLogin(playerid);
 public OnUserLogin(playerid)
 {
-	//Query wurde ausgef√ºhrt und das Ergebnis im Cache gespeichert
+	//Query wurde ausgef¸hrt und das Ergebnis im Cache gespeichert
 	new rows;
 	cache_get_row_count(rows);
 	if(rows == 0)
@@ -1715,7 +1757,7 @@ public OnUserLogin(playerid)
 	}
 	else
 	{
-		//Es existiert ein Ergebnis, das hei√üt der Spieler hat das richtige Passwort eingegeben
+		//Es existiert ein Ergebnis, das heiﬂt der Spieler hat das richtige Passwort eingegeben
 		//Wir lesen nun die erste Zeile des Caches aus (ID 0)
  		cache_get_value_name_int(0, "p_id", PlayerInfo[playerid][p_id]);
 		cache_get_value_name_int(0, "score", PlayerInfo[playerid][pScore]);
@@ -1734,7 +1776,7 @@ public OnUserLogin(playerid)
 forward OnUserCheck(playerid);
 public OnUserCheck(playerid)
 {
-	//Query wurde ausgef√ºhrt und das Ergebnis im Cache gespeichert
+	//Query wurde ausgef¸hrt und das Ergebnis im Cache gespeichert
 	new rows;
 	cache_get_row_count(rows);
 	if(rows == 0)
@@ -1744,7 +1786,7 @@ public OnUserCheck(playerid)
 	}
 	else
 	{
-		//Es existiert ein Ergebnis, das hei√üt der Spieler ist registriert und muss sich einloggen
+		//Es existiert ein Ergebnis, das heiﬂt der Spieler ist registriert und muss sich einloggen
 		ShowPlayerDialog(playerid, DIALOG_LOGIN, DIALOG_STYLE_PASSWORD, "Login", "Please login:", "Login", "Cancel");
 	}
 	return 1;
@@ -1798,10 +1840,10 @@ stock MySQL_SetupConnection(ttl = 3)
 
 	handle = mysql_connect(MYSQL_HOST, MYSQL_USER, MYSQL_PASS, MYSQL_DBSE);
 
-	//Pr√ºfen und gegebenenfalls wiederholen
+	//Pr¸fen und gegebenenfalls wiederholen
 	if(mysql_errno(handle) != 0)
 	{
-		//Fehler im Verbindungsaufbau, pr√ºfe ob ein weiterer Versuch gestartet werden soll
+		//Fehler im Verbindungsaufbau, pr¸fe ob ein weiterer Versuch gestartet werden soll
 		if(ttl > 1)
 		{
 			//Versuche erneut eine Verbindung aufzubauen
@@ -1811,9 +1853,9 @@ stock MySQL_SetupConnection(ttl = 3)
 		}
 		else
 		{
-			//Abbrechen und Server schlie√üen
+			//Abbrechen und Server schlieﬂen
 			print("[MySQL] Es konnte keine Verbindung zur Datenbank hergestellt werden.");
-			print("[MySQL] Bitte pr√ºfen Sie die Verbindungsdaten.");
+			print("[MySQL] Bitte pr¸fen Sie die Verbindungsdaten.");
 			print("[MySQL] Der Server wird heruntergefahren.");
 			return SendRconCommand("exit");
 		}
@@ -1929,7 +1971,7 @@ public OnUserBanCheck(playerid)
 		SCM(playerid,COLOR_LIGHTRED,string);
 	    format(string,sizeof(string),"Ban Date: {FFFFFF}%s",BannerDate);
 		SCM(playerid,COLOR_LIGHTRED,string);
-		if(BanEver == 0) // verwirrend eig steht das f√ºr NICHT permanent gebannt der name klingt aber geil hshahahahahahah wollte es net wd √§ndern kb nvm.
+		if(BanEver == 0) // verwirrend eig steht das f¸r NICHT permanent gebannt der name klingt aber geil hshahahahahahah wollte es net wd ‰ndern kb nvm.
 		{
 			if(BanExpire >=1)
 			{
@@ -2495,7 +2537,7 @@ public UpdateGameMode()
 	                format(string,sizeof(string),"[END] The Attackers %s captured $d/4 Checkpoints and Won the Round!",GetTeamName(stepwinner),Stadt[stepwinner][Captured]);
 	                SendClientMessageToAll(COLOR_GREEN,string);
 	                SetTimer("Restart",9000,0);
-	                // bis 3/4 keine Sorge man hat etwas wie punktez√§nlung und teamriviltIt√§t am ende
+	                // bis 3/4 keine Sorge man hat etwas wie punktez‰nlung und teamriviltIt‰t am ende
 	            }
 	            else
 	            {
@@ -2506,7 +2548,7 @@ public UpdateGameMode()
 	                KillTimer(updater);
 	                Server[Prepared]=false;
 	                SetTimer("NewRound",9000,0);
-	                // bis 3/4 keine Sorge man hat etwas wie punktez√§nlung und teamriviltIt√§t am ende
+	                // bis 3/4 keine Sorge man hat etwas wie punktez‰nlung und teamriviltIt‰t am ende
 	            }
 	            // Ende
 	            return 1;
@@ -2543,7 +2585,7 @@ public UpdateGameMode()
 		                format(string,sizeof(string),"[END] The Attackers %s captured %d/4 Checkpoints and Won the Round!",GetTeamName(stepwinner),Stadt[stepwinner][Captured]);
 		                SendClientMessageToAll(COLOR_GREEN,string);
 		                SetTimer("Restart",9000,0);
-		                // bis 3/4 keine Sorge man hat etwas wie punktez√§nlung und teamriviltIt√§t am ende
+		                // bis 3/4 keine Sorge man hat etwas wie punktez‰nlung und teamriviltIt‰t am ende
 		            }
 		            else
 		            {
@@ -2554,7 +2596,7 @@ public UpdateGameMode()
 		                KillTimer(updater);
 		                Server[Prepared]=false;
 		                SetTimer("NewRound",9000,0);
-		                // bis 3/4 keine Sorge man hat etwas wie punktez√§nlung und teamriviltIt√§t am ende
+		                // bis 3/4 keine Sorge man hat etwas wie punktez‰nlung und teamriviltIt‰t am ende
 		            }
 		            return 1;
 		        }
@@ -2587,7 +2629,7 @@ public UpdateGameMode()
 						SendClientMessageToAll(COLOR_GREEN,string);
 						Stadt[Capture[cpidd][tdefender]][Defended]++;
 					}
-					if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) == GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))  // if wert == 1 return 1; Kampf um 10 sek verl√§ngern?
+					if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) == GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))  // if wert == 1 return 1; Kampf um 10 sek verl‰ngern?
 				    {
 				        // Gebiet gleichstand
 						format(string,sizeof(string),"[CAPTURE] Team %s successfully defended their Zone!",GetTeamName(Capture[cpidd][tdefender]));
@@ -2780,7 +2822,7 @@ public ProgressEnd(playerid,cpidd)
 			format(string,sizeof(string),"[CAPTURE] Team %s successfully defended their Zone!",GetTeamName(Capture[cpidd][tattacker]));
 			SendClientMessageToAll(0xFFFFFFAA,string);
 		}
-		if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) == GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))  // if wert == 1 return 1; Kampf um 10 sek verl√§ngern?
+		if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) == GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))  // if wert == 1 return 1; Kampf um 10 sek verl‰ngern?
 	    {
 	        // Gebiet gleichstand
 			format(string,sizeof(string),"[CAPTURE] Team %s successfully defended their Zone!",GetTeamName(Capture[cpidd][tattacker]));
@@ -3200,6 +3242,19 @@ public LoadMaps()
 	CreateDynamicObject(19375, -686.45129, 1943.46191, -2.56840,   0.00000, 90.00000, 0.00000);
 	CreateDynamicObject(19375, -686.45129, 1933.82959, -2.56840,   0.00000, 90.00000, 0.00000);
 	//
+	
+	
+	// Fabriken erste SF dann LS sowie Auﬂenposten LS
+    CreateDynamicObject(1463,-81.2000000,-1573.3000000,1.9000000,0.0000000,0.0000000,0.0000000); //object(dyn_woodpile2) (1)
+	CreateDynamicObject(1280,-78.8000000,-1573.4000000,2.0000000,0.0000000,0.0000000,0.0000000); //object(parkbench1) (1)
+	CreateDynamicObject(1280,-84.2000000,-1573.6000000,2.0000000,0.0000000,0.0000000,184.2500000); //object(parkbench1) (2)
+	CreateDynamicObject(1280,-81.5000000,-1576.8000000,2.4000000,0.0000000,0.0000000,275.2500000); //object(parkbench1) (3)
+	CreateDynamicObject(1280,-81.4000000,-1570.3000000,2.0000000,0.0000000,0.0000000,89.5000000); //object(parkbench1) (4)
+	CreateDynamicObject(10763,-81.6000000,-1588.1000000,5.4000000,0.0000000,0.0000000,0.0000000); //object(controltower_sfse) (1)
+	CreateDynamicObject(10775,-28.4000000,-1207.1000000,24.9000000,0.0000000,0.0000000,167.2450000); //object(bigfactory_sfse) (1)
+	CreateDynamicObject(10843,-55.2000000,-1240.6000000,10.3000000,0.0000000,0.0000000,0.0000000); //object(bigshed_sfse01) (1)
+	CreateDynamicObject(1337,534.4892600,-1859.4668000,6.1227900,0.0000000,0.0000000,0.0000000); //object(binnt07_la) (1)
+	CreateDynamicObject(10843,431.3999900,-1847.5000000,10.7000000,0.0000000,0.0000000,0.0000000); //object(bigshed_sfse01) (2)
 }
 
 public OnPlayerLeaveDynamicCP(playerid, checkpointid)
@@ -3363,7 +3418,7 @@ public OnDynamicObjectMoved(objectid)
 
 	  		CreateExplosion(ObjPosX,ObjPosY,ObjPosZ,0,30.0);
 
-	    //	printf("Object %d ZERST√ñRT",objectid);
+	    //	printf("Object %d ZERST÷RT",objectid);
 			DestroyDynamicObject(objectid);
 			
 			BombSystem[i][bombid] = -1;
