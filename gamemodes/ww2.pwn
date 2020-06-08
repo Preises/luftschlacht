@@ -1,6 +1,4 @@
-// This is a comment
-// uncomment the line below if you want to write a filterscript
-//#define FILTERSCRIPT
+// Luftschlacht made by Tec9 2019-2020
 
 #include <a_samp>
 #include <ocmd>
@@ -50,7 +48,7 @@ new howfar = 75;
 
 new thetimer;
 
-new Float:rotationfloat = 5.0;
+new Float:rotationfloat = -2400.0;
 
 native gpci (playerid, serial [], len); // this is the native.
 new Float:LSSpawns[][] =
@@ -115,6 +113,11 @@ new PlayerText:TDEditor_PTD[MAX_PLAYERS];
 new PlayerText:TeamCapturePoints[MAX_PLAYERS];
 new LastDriver[MAX_VEHICLES];
 new LastCar[MAX_PLAYERS];
+new PlayerText:PlayerBox[MAX_PLAYERS];
+
+new PlayerText:BombsTextDraw[MAX_PLAYERS];
+
+new DroppingBombs[MAX_PLAYERS];
 
 //
 #define MAX_STADT 3
@@ -238,7 +241,8 @@ enum pDataEnum
 	pTutStep,
 	pTutorial,
 	pAdmin,
-	bool:pIPBanCheck
+	bool:pIPBanCheck,
+	bool:pBoxShown
 }
 new PlayerInfo[MAX_PLAYERS][pDataEnum];
 
@@ -287,10 +291,12 @@ new Capture[MAX_CAPTURE_POINTS][CapturePoints];
 enum VehicleEnum{
 	teamidd,
 	vehtype,
-	LocalID
+	LocalID,
+	bombs
 }
 new VehicleInfo[MAX_VEHICLES][VehicleEnum];
 
+//vehtype = 0 normal, vehtype = 1 stukabomber
 
 
 
@@ -415,6 +421,8 @@ public OnGameModeInit()
 	for(new i = 0; i < MAX_VEHICLES; i++)
 	{
 		LastDriver[i] = INVALID_PLAYER_ID;
+		
+		VehicleInfo[i][bombs] = 100;
 	}
 	
 
@@ -484,6 +492,45 @@ public OnPlayerConnect(playerid)
 	PlayerTextDrawBackgroundColor(playerid, TeamCapturePoints[playerid], 255);
 	PlayerTextDrawFont(playerid, TeamCapturePoints[playerid], 1);
 	PlayerTextDrawSetProportional(playerid, TeamCapturePoints[playerid], 1);
+	
+	
+	
+	
+	
+	// PlayerBox
+    PlayerBox[playerid] = CreatePlayerTextDraw(playerid,17.000007, 126.118553, "Text__");
+	PlayerTextDrawLetterSize(playerid,PlayerBox[playerid], 0.517666, 2.006517);
+	PlayerTextDrawTextSize(playerid,PlayerBox[playerid], 212.000000, 0.000000);
+	//PlayerTextDrawTextSize(playerid,PlayerBox[playerid], 510.000000, 0.000000);
+	PlayerTextDrawAlignment(playerid,PlayerBox[playerid], 1);
+	PlayerTextDrawColor(playerid,PlayerBox[playerid], COLOR_GREY);
+	PlayerTextDrawSetShadow(playerid,PlayerBox[playerid], 0);
+	PlayerTextDrawSetOutline(playerid,PlayerBox[playerid], 0);
+	PlayerTextDrawBackgroundColor(playerid,PlayerBox[playerid], 255);
+	PlayerTextDrawFont(playerid,PlayerBox[playerid], 1);
+	PlayerTextDrawSetProportional(playerid,PlayerBox[playerid], 1);
+	PlayerTextDrawSetShadow(playerid,PlayerBox[playerid], 0);
+	PlayerTextDrawBoxColor(playerid,PlayerBox[playerid], 0x00000089);
+	PlayerTextDrawUseBox(playerid,PlayerBox[playerid], 1);
+	  //
+	  
+	  
+	  
+	  // Bomben in Flugzeug
+    BombsTextDraw[playerid] = CreatePlayerTextDraw(playerid, 536.666625, 168.014831, "Bombs:_10");
+	PlayerTextDrawLetterSize(playerid, BombsTextDraw[playerid], 0.351333, 1.496296);
+	PlayerTextDrawAlignment(playerid, BombsTextDraw[playerid], 1);
+	PlayerTextDrawColor(playerid, BombsTextDraw[playerid], -1);
+	PlayerTextDrawSetShadow(playerid, BombsTextDraw[playerid], 0);
+	PlayerTextDrawSetOutline(playerid, BombsTextDraw[playerid], 0);
+	PlayerTextDrawBackgroundColor(playerid, BombsTextDraw[playerid], 255);
+	PlayerTextDrawFont(playerid, BombsTextDraw[playerid], 2);
+	PlayerTextDrawSetProportional(playerid, BombsTextDraw[playerid], 1);
+	PlayerTextDrawSetShadow(playerid, BombsTextDraw[playerid], 0);
+	  
+	  
+	  
+	  //
 	return 1;
 }
 
@@ -1225,8 +1272,6 @@ stock GetCarFunctionNew(carid)
 stock GetCarFunctionNew(vehicle)
 {
   //  new team = GetPlayerTeam(playerid);
-    
-    
     for(new i = 0; i < MAX_VEHICLES; i++)
 	{
 		if(i!=INVALID_VEHICLE_ID)
@@ -1238,11 +1283,41 @@ stock GetCarFunctionNew(vehicle)
 		}
 	}
 	return 0; // oder 255 musste abfrage ändern
-	
 }
 
-	
 
+
+stock GetVehicleType(vehicle)
+{
+  //  new team = GetPlayerTeam(playerid);
+    for(new i = 0; i < MAX_VEHICLES; i++)
+	{
+		if(i!=INVALID_VEHICLE_ID)
+		{
+		    if(vehicle == VehicleInfo[i][LocalID])
+		    {
+		        return VehicleInfo[i][vehtype];
+			}
+		}
+	}
+	return 0; // oder 255 musste abfrage ändern
+}
+
+
+stock GetVehicleVehicleInfo(vehicle)
+{
+    for(new i = 0; i < MAX_VEHICLES; i++)
+	{
+		if(i!=INVALID_VEHICLE_ID)
+		{
+		    if(vehicle == VehicleInfo[i][LocalID])
+		    {
+		        return i;
+			}
+		}
+	}
+	return -1; // kein VehicleInfo Fahrzeug!
+}
 
 stock randomEx(min, max)
 {
@@ -1429,7 +1504,19 @@ public OnPlayerStateChange(playerid, newstate, oldstate)
 		    LastDriver[GetPlayerVehicleID(playerid)] = playerid;
 		    LastCar[playerid] = GetPlayerVehicleID(playerid);
 		}
-	}/*
+		if(GetVehicleModel(veh) == 476)
+		{
+		    ShowPlayerBox(playerid,"Use SPACE to drop one Bomb. Press ALT to drop a bunch of bombs.",5);
+		}
+	}
+	if(newstate & PLAYER_STATE_ONFOOT)
+	{
+	    DeletePVar(playerid,"DroppingBombs");
+		DeletePVar(playerid,"DroppingFrom");
+
+		DeletePVar(playerid,"DropTime");
+	}
+	/*
 	if(oldstate == PLAYER_STATE_DRIVER && newstate == PLAYER_STATE_ONFOOT)
 	{
 		if(LastCar[playerid]!=INVALID_VEHICLE_ID)
@@ -1542,14 +1629,31 @@ public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 	if(newkeys & KEY_HANDBRAKE)
 	{
 	    //SCM(playerid,-1,"Key SpRINT!");
-	    if(IsPlayerInAnyVehicle(playerid))
+	    if(IsPlayerInAnyVehicle(playerid) && !DroppingBombs[playerid])
 	    {
-	        //SCM(playerid,-1,"Key SpRINT! Vehicle.");
+	        //SCM(playerid,-1,"Key SpRINT! Vehicle."); KEY_WALK
+	        new veh = GetPlayerVehicleID(playerid);
 	        new model = GetVehicleModel(GetPlayerVehicleID(playerid));
-	        if(model == 476)
+	        if(model == 476 && GetVehicleType(veh) == 0)
 	        {
-	        //	SCM(playerid,-1,"yes");
-	        	DropBomb(playerid);
+	        	SCM(playerid,-1,"yes#1");
+	        	DropBomb(playerid,0);
+		 	}
+		}
+	}
+	new dropbombs = GetPVarInt(playerid,"DroppingBombs");
+	if(newkeys & KEY_FIRE && dropbombs == 0)
+	{
+	    SCM(playerid,-1,"Key KEY_LOOK_BEHIND!");
+	    if(IsPlayerInAnyVehicle(playerid) && !DroppingBombs[playerid])
+	    {
+	        SCM(playerid,-1,"Key KEY_LOOK_BEHIND! Vehicle."); //KEY_WALK
+	        new veh = GetPlayerVehicleID(playerid);
+	        new model = GetVehicleModel(GetPlayerVehicleID(playerid));
+	        if(model == 476 && GetVehicleType(veh) == 0)
+	        {
+	        	SCM(playerid,-1,"yes#2");
+	        	DropBomb(playerid,1);
 		 	}
 		}
 	}
@@ -1568,6 +1672,31 @@ public OnPlayerUpdate(playerid)
 	    SetPlayerHealth(playerid,80.0);
 	}
  	*/
+ 	
+ 	
+ 	new dropbombs = GetPVarInt(playerid,"DroppingBombs");
+	new i = GetPVarInt(playerid,"DroppingFrom");
+	
+	new Float:droptime = GetPVarFloat(playerid,"DropTime");
+	
+	if(dropbombs > 0)
+	{
+	    printf("DEBUG: EINS: Spieler %s, dropbombs: %d, droptime: %f,gettime: %d, Fahrzeug: %i",GetName(playerid),dropbombs, droptime,gettime(), i);
+		if(VehicleInfo[i][LocalID]!=INVALID_VEHICLE_ID)
+		{
+		    printf("DEBUG: ZWEI: Spieler %s, dropbombs: %d, droptime: %f, gettime: %d Fahrzeug: %i",GetName(playerid),dropbombs, droptime,gettime(), i);
+	/*		if(gettime() > droptime)
+			{*/
+			    printf("DEBUG: DREI: Spieler %s, dropbombs: %d, droptime: %f, gettime: %d Fahrzeug: %i",GetName(playerid),dropbombs, droptime, gettime(),i);
+   				DropBomb(playerid,0);
+   				droptime = gettime()+1;
+   				
+   				SetPVarFloat(playerid,"DropTime",droptime);
+	//		}
+		}
+		
+		// bei aussteignne zurcüsketzen
+	}
 	return 1;
 }
 /*
@@ -1831,6 +1960,10 @@ stock ResetPlayerVariables(playerid)
 	PlayerInfo[playerid][pTutorial]=false;
 	PlayerInfo[playerid][pTutStep]     = 0;
 	PlayerInfo[playerid][pIPBanCheck]=false;
+	
+	PlayerInfo[playerid][pBoxShown] = false;
+	
+	DroppingBombs[playerid] = 0;
 	return 1;
 }
 stock MySQL_SetupConnection(ttl = 3)
@@ -3352,48 +3485,71 @@ stock getFreeBomb()
 	}
 	return -1;
 }
-stock DropBomb(playerid)
+stock DropBomb(playerid,art)
 {
-	new id = getFreeBomb();
+	SCM(playerid,-1,"Funktion aufgerufen, 1");
+    new i = GetVehicleVehicleInfo(GetPlayerVehicleID(playerid));
+    
+    if(VehicleInfo[i][bombs] <1) return 0;
+    new id = getFreeBomb();
 	if(id == -1) return SCM(playerid,COLOR_RED,"Couldn't drop a Bomb!");
+    // art 0 = 1x bombe, art 1 = 3er Bombe
+    if(art == 1)
+    {
+        if(VehicleInfo[i][bombs] <3) return 0;
+		SetPVarInt(playerid,"DroppingBombs",3);
+		SetPVarInt(playerid,"DroppingFrom",i);
+	}
+    else
+    {
+        new dropbombs = GetPVarInt(playerid,"DroppingBombs");
 	
-	BombSystem[id][bombid] = id;
-	new Float: PlayerX, Float: PlayerY, Float: PlayerZ;
-	GetPlayerPos(playerid,PlayerX,PlayerY,PlayerZ);
+	    dropbombs--;
+	    if(dropbombs <= 0) { dropbombs = 0;}
+	    
+	    SetPVarInt(playerid,"DroppingBombs",dropbombs);
 	
-	
-	if(PlayerZ > 10)
-	{
-		new Float:Height;
-	//	MapAndreas_FindZ_For2DCoord(PlayerX, PlayerY, Height);
+		BombSystem[id][bombid] = id;
+		new Float: PlayerX, Float: PlayerY, Float: PlayerZ;
+		GetPlayerPos(playerid,PlayerX,PlayerY,PlayerZ);
 
+
+		if(PlayerZ > 10)
+		{
+			new Float:Height;
 		
-        PlayerZ = PlayerZ - 1;
-		BombSystem[id][localBomb] = CreateDynamicObject(1636,PlayerX,PlayerY,PlayerZ,0,0,0);
 
-		GetXYInFrontOfPlayer(playerid,PlayerX,PlayerY,howfar);
 
-        new Float:rx, Float:ry, Float:rz;
-        GetDynamicObjectRot(BombSystem[id][localBomb],rx,ry,rz);
-        MapAndreas_FindZ_For2DCoord(PlayerX, PlayerY, Height);
-      //  new finalZ = Height-= PlayerZ;
-        
-        
-		MoveDynamicObject(BombSystem[id][localBomb],PlayerX,PlayerY,Height,speed);
+	        PlayerZ = PlayerZ - 1;
+			BombSystem[id][localBomb] = CreateDynamicObject(1636,PlayerX,PlayerY,PlayerZ,0,0,0);
+
+			GetXYInFrontOfPlayer(playerid,PlayerX,PlayerY,howfar);
+
+	        new Float:rx, Float:ry, Float:rz;
+	        GetDynamicObjectRot(BombSystem[id][localBomb],rx,ry,rz);
+	        MapAndreas_FindZ_For2DCoord(PlayerX, PlayerY, Height);
+	     
+
+
+			new movetime = MoveDynamicObject(BombSystem[id][localBomb],PlayerX,PlayerY,Height,speed);
+
+            DroppingBombs[playerid] = 1;
+            
+            SetTimerEx("NotDroppingBombs",movetime,0,"i",playerid);
 		
-	    //rx+rotationfloat,ry+rotationfloat,rz+rotationfloat
+		}
 	}
 	
 	return 1;
 	
 }
 
-/*
-new Float:rx, Float:ry, Float:rz;
-            GetDynamicObjectRot(BombSystem[i][localBomb],rx,ry,rz);
 
-            SetDynamicObjectRot(BombSystem[i][localBomb],rx+0.5,ry+0.5,rz+0.5);
-*/
+forward NotDroppingBombs(playerid);
+public NotDroppingBombs(playerid)
+{
+    DroppingBombs[playerid] = 0;
+}
 
 stock IsABombObject(objid)
 {
@@ -3474,8 +3630,7 @@ ocmd:rotation(playerid,params[])
 
 stock GetXYInFrontOfPlayer(playerid, &Float:x, &Float:y, Float:distance)
 {
-    // Created by ******
-
+    //unknown author
     new Float:a;
 
     GetPlayerPos(playerid, x, y, a);
@@ -3491,7 +3646,29 @@ stock GetXYInFrontOfPlayer(playerid, &Float:x, &Float:y, Float:distance)
 
 }
 
+stock ShowPlayerBox(playerid,textbox[],interval)
+{
+	if(!strlen(textbox)) {SCM(playerid,-1,"Errorcode: 11111"); return 0;}
+	if(strlen(textbox) > 150) {SCM(playerid,-1,"Errorcode: 22222"); return 0;}
+	if(interval <-1 || interval > 1000) {SCM(playerid,-1,"Errorcode: 333333"); return 0;}
+	if(PlayerInfo[playerid][pBoxShown]==true) {HideBox(playerid);}
+	PlayerInfo[playerid][pBoxShown]=true;
+	if(interval !=-1) // nicht uendlich
+	{
+	    SetTimerEx("HideBox", interval*1000, false, "i", playerid);
+	}
+	PlayerTextDrawSetString(playerid,PlayerBox[playerid],textbox);
+ 	PlayerTextDrawShow(playerid, PlayerBox[playerid]);
 
+ 	PlayerPlaySound(playerid,1084,0.0,0.0,0.0);
+	return 1;
+}
 
-
+forward HideBox(playerid);
+public HideBox(playerid)
+{
+ 	PlayerTextDrawHide(playerid, PlayerBox[playerid]);
+ 	PlayerInfo[playerid][pBoxShown]=false;
+ 	return 1;
+}
 //
