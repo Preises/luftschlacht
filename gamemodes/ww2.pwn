@@ -14,43 +14,45 @@
 main()
 {
 	print("\n----------------------------------");
-	print(" Blank Gamemode by your name here");
+	print(" Luftschlacht - Made by Tec9");
 	print("----------------------------------\n");
 }
 
-// MySQL Define
+// Dialog Defines
 
-
-
+enum
+{
+    DIALOG_REGISTER,
+    DIALOG_LOGIN,
+    DIALOG_BAN,
+    DIALOG_TUTORIAL,
+    DIALOG_STATS
+    
+}
 
 
 //
 
-// Defines
+// Global Variabels
 
-#define DIALOG_REGISTER  1
-#define DIALOG_LOGIN     2
-#define DIALOG_BAN     3
-#define DIALOG_TUTORIAL     4
-#define DIALOG_STATS 5
-#define SCM SendClientMessage
-//
-
-// Variablen
-// Global
 new Text:TDEditor_TD[3];
 new startcounter;
 new gangzone;
 new updater;
-new Float:speed = 40.0;
+new Float:debug_speed = 40.0; // How fast are the bomb objects moving?
 
-new howfar = 75;
+new debug_howfar = 75; // how far from the Players Forward Position are the bombs being dropped in a bomber.
 
-new thetimer;
+new Float:debug_rotationfloat = -2400.0;  // how far does the bomb rotate while being dropped?
 
-new Float:rotationfloat = -2400.0;
+new MySQL:handle; // MySQL SA:MP GameMode connection!
+//
 
-native gpci (playerid, serial [], len); // this is the native.
+// natives
+
+native gpci (playerid, serial [], len);
+
+// Spawns
 new Float:LSSpawns[][] =
 {
     {256.0207,-1845.6223,3.3293,87.5131}, // LS1
@@ -106,8 +108,7 @@ new Float:SFEnemySpawn[][] = // F¸r LS
     {-284.3905,-1533.3843,6.8339,38.7097}
 };
 
-// Player
-//new mytext[128];
+// Player Variables
 
 new PlayerText:TDEditor_PTD[MAX_PLAYERS];
 new PlayerText:TeamCapturePoints[MAX_PLAYERS];
@@ -120,7 +121,14 @@ new PlayerText:BombsTextDraw[MAX_PLAYERS];
 new DroppingBombs[MAX_PLAYERS];
 
 //
-#define MAX_STADT 3
+
+//General defines
+#define SCM SendClientMessage
+
+//
+
+// Gameplay Defines
+#define MAX_CITIES 3
 
 #define MAX_CAPTURE_POINTS 8
 
@@ -211,10 +219,8 @@ new DroppingBombs[MAX_PLAYERS];
 #define COLOR_INVIS 0xAFAFAF00
 #define COLOR_SPEC 0xBFC0C200
 //
-new MySQL:handle;
-/*
-new LSflugzeuge[13];
-new SFflugzeuge[13];*/
+
+
 
 // Enums
 enum pDataEnum
@@ -246,17 +252,17 @@ enum pDataEnum
 }
 new PlayerInfo[MAX_PLAYERS][pDataEnum];
 
-enum Citydings
+enum City_Enum
 {
-	LuftMacht,
-	LuftFlugzeuge,
-	Captured,
-	Defended
+	Air_Superiority, // get air superiority of a City !  > Description: Each city has 50% air superiority, so 100% together. If you shoot a plane, your team gets + 1% Air Superiority. If you're being shot down by an enemy your team loses 1%
+	LuftFlugzeuge,  // get numbers of planes of a City!
+	Captured,       // how many checkpoints your team captured in this round
+	Defended        // how many checkpoints were successfully defended after the enemy attemptet to capture it
 }
-new Stadt[MAX_STADT][Citydings];
+new City[MAX_CITIES][City_Enum];
 
 
-enum ServerModus{
+enum ServerMode{
 	InvasionStep,
 	bool:LandGefecht,
 	bool:Prepared,
@@ -269,7 +275,7 @@ enum ServerModus{
 	Sekunden
 	
 }
-new Server[ServerModus];
+new Server[ServerMode];
 
 
 enum CapturePoints{
@@ -813,8 +819,8 @@ public NotifyPlayers()
 
 stock GetMostPlanes()
 {
-	if(Stadt[1][LuftFlugzeuge] > Stadt[2][LuftFlugzeuge]) return 1;
-	else if(Stadt[1][LuftFlugzeuge] < Stadt[2][LuftFlugzeuge]) return 2;
+	if(City[1][LuftFlugzeuge] > City[2][LuftFlugzeuge]) return 1;
+	else if(City[1][LuftFlugzeuge] < City[2][LuftFlugzeuge]) return 2;
 	else return 999;
 }
 stock RemoveBuildingsForPlayer(playerid)
@@ -823,10 +829,12 @@ stock RemoveBuildingsForPlayer(playerid)
 	printf("Alright");
 	return 1;
 }
-stock GetLuftUberlegenHeit()
+
+
+stock GetAirSuperiority()
 {
-	if(Stadt[1][LuftMacht] > Stadt[2][LuftMacht]) return 1;
-	else if(Stadt[1][LuftMacht] < Stadt[2][LuftMacht]) return 2;
+	if(City[1][Air_Superiority] > City[2][Air_Superiority]) return 1;
+	else if(City[1][Air_Superiority] < City[2][Air_Superiority]) return 2;
 	else return 999;
 }
 
@@ -836,7 +844,7 @@ public CheckAirWinners()
 	new karm,string[128],gewinner;
     if(Server[LandGefecht]==false && karm != 1)
     {
-    	if(Stadt[1][LuftFlugzeuge]==0 || Stadt[2][LuftFlugzeuge]==0)
+    	if(City[1][LuftFlugzeuge]==0 || City[2][LuftFlugzeuge]==0)
 	    {
 	        karm++;
      		gewinner = GetMostPlanes();
@@ -857,10 +865,10 @@ public CheckAirWinners()
 				return 1;
 			}
 	    }
-	    if(Stadt[1][LuftMacht]>=80 || Stadt[2][LuftMacht]>=80 )
+	    if(City[1][Air_Superiority]>=80 || City[2][Air_Superiority]>=80 )
 	    {
 	        karm++;
-	        gewinner = GetLuftUberlegenHeit();
+	        gewinner = GetAirSuperiority();
 	        if(gewinner == 999)return SendClientMessageToAll(-1,"Second 999");
 	        else
 	        Server[PreparePhase2]=true;
@@ -1108,21 +1116,21 @@ stock PrepareGameMode()
     Server[LandGefecht]=false;
     Server[CanSpawn]=false;
     Server[FiveSecondStart]=false;
-    Stadt[1][LuftFlugzeuge]=55;  // temp vorher 55
-    Stadt[2][LuftFlugzeuge]=55;
+    City[1][LuftFlugzeuge]=55;  // temp vorher 55
+    City[2][LuftFlugzeuge]=55;
     
-    Stadt[1][LuftMacht]=50;
-    Stadt[2][LuftMacht]=50;
+    City[1][Air_Superiority]=50;
+    City[2][Air_Superiority]=50;
     
     Server[Prepared]=true;
     
     Server[EtappenWinner]=255;
     
-    Stadt[1][Captured]=0;
-    Stadt[2][Captured]=0;
+    City[1][Captured]=0;
+    City[2][Captured]=0;
     
-    Stadt[1][Defended]=0;
-    Stadt[2][Defended]=0;
+    City[1][Defended]=0;
+    City[2][Defended]=0;
     
     Server[Minuten]=2;
     Server[Sekunden]=0;
@@ -1436,20 +1444,20 @@ public OnVehicleDeath(vehicleid, killerid)
 		{
 			if(IsTeamMate(playerid))
 			{
-		    	Stadt[team][LuftFlugzeuge]--;
-		    	Stadt[team][LuftMacht]--;
-		    	Stadt[teamenemy][LuftMacht]++;
+		    	City[team][LuftFlugzeuge]--;
+		    	City[team][Air_Superiority]--;
+		    	City[teamenemy][Air_Superiority]++;
 			}
 		}
 	    if(GetPlayerTeam(killerid)!=255 && killerid != INVALID_PLAYER_ID)
 	    {
 			new opfer=GetPlayerTeam(playerid),teamyo=GetEnemy(opfer);
 			
-			Stadt[teamyo][LuftMacht]++;
+			City[teamyo][Air_Superiority]++;
 			
-			Stadt[opfer][LuftMacht]--;
+			City[opfer][Air_Superiority]--;
 			
-			Stadt[opfer][LuftFlugzeuge]--;
+			City[opfer][LuftFlugzeuge]--;
 			
 			//GiveMoneySave (Killerod)
 		}
@@ -1997,32 +2005,7 @@ stock MySQL_SetupConnection(ttl = 3)
 	return 1;
 }
 
-ocmd:gethere(playerid,params[])
-{
-	new pid;
-	if(!IsPlayerAdminEx(playerid,1))return SCM(playerid,COLOR_RED,"You are not permitted.");
-	if(sscanf(params,"u",pid))return SendClientMessage(playerid,-1,"/gethere[playerid]");
-	new Float:px,Float:py,Float:pz;
-	
-	GetPlayerPos(playerid,px,py,pz);
-	
-	SetPlayerPos(pid,px+1,py,pz);
-	return 1;
-}
 
-ocmd:setadmin(playerid,params[])
-{
-	if(!IsPlayerAdmin(playerid))return SCM(playerid,COLOR_RED,"You are no RCON-Admin!");
-	new pid,admin,string[100];
-	if(sscanf(params,"ud",pid,admin))return SendClientMessage(playerid,-1,"/setadmin [playerid][Admin]");
-	PlayerInfo[pid][pAdmin]=admin;
-	
-	format(string,sizeof(string),"%s is now Admin-Level %d",GetName(pid),admin);
-	SCM(playerid,COLOR_GREEN,string);
-	format(string,sizeof(string),"You were setted to Admin-Level %d by Administrator %s",admin,GetName(playerid));
-	SCM(pid,COLOR_GREEN,string);
-	return 1;
-}
 
 stock IsPlayerAdminEx(playerid,admlvl)
 {
@@ -2030,38 +2013,7 @@ stock IsPlayerAdminEx(playerid,admlvl)
 	return 0;
 }
 
-ocmd:kick(playerid,params[])
-{
-    new pid,reason[128],string[128];
-    if(!IsPlayerAdminEx(playerid,1))return SCM(playerid,COLOR_RED,"You are not permitted.");
-    if(sscanf(params,"us",pid,reason))return SendClientMessage(playerid,-1,"/kick [playerid][Reason]");
-    if(strlen(reason) > 50) return SCM(playerid,COLOR_LIGHTRED,"Max: 50 Letters!");
 
-	if(PlayerInfo[pid][pAdmin]>=PlayerInfo[playerid][pAdmin]) return SCM(playerid,COLOR_LIGHTRED,"You can't kick Admins on your Level!");
-	format(string,sizeof(string),"[SYSTEM]: Adminstrator %s kicked %s, Reason: %s",GetName(playerid),GetName(pid),reason);
-	SendClientMessageToAll(COLOR_GREEN,string);
-	Kick(pid);
-	return 1;
-}
-ocmd:ban(playerid,params[])
-{
-    new pid,reason[128],string[128],days,zeitdauer,zeitbann;
-    if(!IsPlayerAdminEx(playerid,2))return SCM(playerid,COLOR_RED,"You are not permitted.");
-    if(sscanf(params,"usd",pid,reason,days))return SendClientMessage(playerid,-1,"/ban [playerid][Reason][Days] [UNLIMITED = 999]");
-    if(strlen(reason) > 50) return SCM(playerid,COLOR_LIGHTRED,"Max: 50 Letters!");
-	if(PlayerInfo[pid][pLoggedIn]==0)return SCM(playerid,COLOR_LIGHTRED,"Error: Player not Logged In, Ban wouldn't have any Effect.");
-	if(PlayerInfo[pid][pAdmin]>=PlayerInfo[playerid][pAdmin]) return SCM(playerid,COLOR_LIGHTRED,"You can't Ban Admins on your Level!");
-	format(string,sizeof(string),"[SYSTEM]: Adminstrator %s banned %s for %i Days, Reason: %s",GetName(playerid),GetName(pid),days,reason);
-	zeitdauer = gettime()+(60*60*24*days);
-	if(days == 999)
-	{
-		zeitbann = 1;
-		format(string,sizeof(string),"[SYSTEM]: Adminstrator %s permanently %s banned %s, Reason: %s",GetName(playerid),GetName(pid),reason);
-	}
-	BanUser(pid,GetName(playerid),reason,zeitdauer,zeitbann);
-	SendClientMessageToAll(COLOR_LIGHTRED,string);
-	return 1;
-}
 
 stock CheckUserBan(playerid)
 {
@@ -2180,24 +2132,6 @@ stock BanUser(playerid,admin[],reason[],zeitdauer,zeitbann)
 	return 1;
 }
 
-ocmd:veh(playerid,params[])
-{
-    if(PlayerInfo[playerid][pClassSelection] == false && PlayerInfo[playerid][pLoggedIn]==1)
-    {
-		new vehid, color1,color2;
-		if(!IsPlayerAdminEx(playerid,1))return SCM(playerid,COLOR_RED,"You are not permitted.");
-		if(sscanf(params,"iii",vehid,color1,color2))return SendClientMessage(playerid,COLOR_LIGHTRED,"Use: /veh [vehicleID][Color1][Color2]");
-
-		new Float: X, Float: Y, Float: Z,Float:A;
-
-		GetPlayerPos(playerid,X,Y,Z);
-		GetPlayerFacingAngle(playerid,A);
-		new car = CreateVehicle(vehid,X,Y,Z,A,color1,color2,-1);
-		PutPlayerInVehicle(playerid,car,0);
-		return 1;
-	}
-	return 1;
-}
 //sscanf
 stock sscanf(string[], format[], {Float,_}:...)
 {
@@ -2665,17 +2599,17 @@ public UpdateGameMode()
 	        {
 	            new stepwinner = Server[EtappenWinner];
 	            Server[PreparePhase2]=false;
-	            if(Stadt[stepwinner][Captured]>2)
+	            if(City[stepwinner][Captured]>2)
 	            {
-	                format(string,sizeof(string),"[END] The Attackers %s captured $d/4 Checkpoints and Won the Round!",GetTeamName(stepwinner),Stadt[stepwinner][Captured]);
+	                format(string,sizeof(string),"[END] The Attackers %s captured $d/4 Checkpoints and Won the Round!",GetTeamName(stepwinner),City[stepwinner][Captured]);
 	                SendClientMessageToAll(COLOR_GREEN,string);
 	                SetTimer("Restart",9000,0);
 	                // bis 3/4 keine Sorge man hat etwas wie punktez‰nlung und teamriviltIt‰t am ende
 	            }
 	            else
 	            {
-	                if(Stadt[stepwinner][Defended] == 0) {Stadt[stepwinner][Defended]=4;}
-	                format(string,sizeof(string),"Team %s defended their Territory by holding %d/4 Checkpoints!",GetTeamName(GetEnemy(stepwinner)),Stadt[stepwinner][Defended]);
+	                if(City[stepwinner][Defended] == 0) {City[stepwinner][Defended]=4;}
+	                format(string,sizeof(string),"Team %s defended their Territory by holding %d/4 Checkpoints!",GetTeamName(GetEnemy(stepwinner)),City[stepwinner][Defended]);
 	                SendClientMessageToAll(COLOR_GREEN,string);
 	                SendClientMessageToAll(COLOR_GREEN,"The Match is starting into a new Round!");
 	                KillTimer(updater);
@@ -2713,17 +2647,17 @@ public UpdateGameMode()
 		        else if(Server[Minuten] == 0)
 		        {
 		            new stepwinner = Server[EtappenWinner];
-		            if(Stadt[stepwinner][Captured]>2)
+		            if(City[stepwinner][Captured]>2)
 		            {
-		                format(string,sizeof(string),"[END] The Attackers %s captured %d/4 Checkpoints and Won the Round!",GetTeamName(stepwinner),Stadt[stepwinner][Captured]);
+		                format(string,sizeof(string),"[END] The Attackers %s captured %d/4 Checkpoints and Won the Round!",GetTeamName(stepwinner),City[stepwinner][Captured]);
 		                SendClientMessageToAll(COLOR_GREEN,string);
 		                SetTimer("Restart",9000,0);
 		                // bis 3/4 keine Sorge man hat etwas wie punktez‰nlung und teamriviltIt‰t am ende
 		            }
 		            else
 		            {
-		                if(Stadt[stepwinner][Defended] == 0) {Stadt[stepwinner][Defended]=4;}
-		                format(string,sizeof(string),"Team %s defended their Territory by holding %d/4 Checkpoints!",GetTeamName(GetEnemy(stepwinner)),Stadt[stepwinner][Defended]);
+		                if(City[stepwinner][Defended] == 0) {City[stepwinner][Defended]=4;}
+		                format(string,sizeof(string),"Team %s defended their Territory by holding %d/4 Checkpoints!",GetTeamName(GetEnemy(stepwinner)),City[stepwinner][Defended]);
 		                SendClientMessageToAll(COLOR_GREEN,string);
 		                SendClientMessageToAll(COLOR_GREEN,"The Match goes to the next Round!");
 		                KillTimer(updater);
@@ -2753,21 +2687,21 @@ public UpdateGameMode()
 						SendClientMessageToAll(COLOR_GREEN,string);
 						Capture[cpidd][owner]=Capture[cpidd][tattacker];
 						
-						Stadt[Capture[cpidd][tattacker]][Captured]++;
+						City[Capture[cpidd][tattacker]][Captured]++;
 					}
 			        if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) < GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))
 				    {
 				        // Gebiet verteidigt
 						format(string,sizeof(string),"[CAPTURE] Team %s successfully defended their Zone!",GetTeamName(Capture[cpidd][tdefender]));
 						SendClientMessageToAll(COLOR_GREEN,string);
-						Stadt[Capture[cpidd][tdefender]][Defended]++;
+						City[Capture[cpidd][tdefender]][Defended]++;
 					}
 					if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) == GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))  // if wert == 1 return 1; Kampf um 10 sek verl‰ngern?
 				    {
 				        // Gebiet gleichstand
 						format(string,sizeof(string),"[CAPTURE] Team %s successfully defended their Zone!",GetTeamName(Capture[cpidd][tdefender]));
 						SendClientMessageToAll(COLOR_GREEN,string);
-                        Stadt[Capture[cpidd][tdefender]][Defended]++;
+                        City[Capture[cpidd][tdefender]][Defended]++;
 					}
 
 					if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) ==0 && GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender] ==0))
@@ -2823,15 +2757,15 @@ public UpdateGameMode()
 				{
 				    if(team == Server[EtappenWinner])
 				    {
-                   // 	format(string, sizeof(string), "{01DF01}%d{FFFFFF}/{FFFF00}4{FFFFFF} Captured", Stadt[team][Captured]);
-                        format(string, sizeof(string), "%d/4", Stadt[team][Captured]);
+                   // 	format(string, sizeof(string), "{01DF01}%d{FFFFFF}/{FFFF00}4{FFFFFF} Captured", City[team][Captured]);
+                        format(string, sizeof(string), "%d/4", City[team][Captured]);
 						PlayerTextDrawSetString(i,TeamCapturePoints[i], string);
 						PlayerTextDrawColor(i, TeamCapturePoints[i], COLOR_GREEN);
 					}
 					else if(team != Server[EtappenWinner])
 					{
-					   // format(string, sizeof(string), "{FF0000}%d{FFFFFF}/{FFFF00}4{FF0000} lost", Stadt[enemy][Captured]);
-					    format(string, sizeof(string), "%d/4", Stadt[enemy][Captured]);
+					   // format(string, sizeof(string), "{FF0000}%d{FFFFFF}/{FFFF00}4{FF0000} lost", City[enemy][Captured]);
+					    format(string, sizeof(string), "%d/4", City[enemy][Captured]);
 						PlayerTextDrawSetString(i,TeamCapturePoints[i], string);
 						PlayerTextDrawColor(i, TeamCapturePoints[i], COLOR_RED);
 					}
@@ -2856,9 +2790,9 @@ public UpdateGameMode()
 	                new team = GetPlayerTeam(i);
 	                new enemy = GetEnemy(team);
 	                if(team == 1 || team == 2)
-	                if(Stadt[team][LuftFlugzeuge]==Stadt[enemy][LuftFlugzeuge] || Stadt[team][LuftFlugzeuge]>Stadt[enemy][LuftFlugzeuge] && PlayerInfo[i][pDead]==false)
+	                if(City[team][LuftFlugzeuge]==City[enemy][LuftFlugzeuge] || City[team][LuftFlugzeuge]>City[enemy][LuftFlugzeuge] && PlayerInfo[i][pDead]==false)
 	                {
-	                    format(string, sizeof(string), "%02d", Stadt[enemy][LuftFlugzeuge]); // %02d
+	                    format(string, sizeof(string), "%02d", City[enemy][LuftFlugzeuge]); // %02d
     					PlayerTextDrawSetString(i,TDEditor_PTD[i], string);
 	                    PlayerTextDrawColor(i, TDEditor_PTD[i], COLOR_RED);
 	                    if(PlayerInfo[i][pDead]==false)
@@ -2867,9 +2801,9 @@ public UpdateGameMode()
 						}
 
 					}
-					if(Stadt[enemy][LuftFlugzeuge] > Stadt[team][LuftFlugzeuge])
+					if(City[enemy][LuftFlugzeuge] > City[team][LuftFlugzeuge])
 					{
-					    format(string, sizeof(string), "%02d", Stadt[team][LuftFlugzeuge]);
+					    format(string, sizeof(string), "%02d", City[team][LuftFlugzeuge]);
     					PlayerTextDrawSetString(i,TDEditor_PTD[i], string);
 					    PlayerTextDrawColor(i, TDEditor_PTD[i], COLOR_BLUE);
 					    if(PlayerInfo[i][pDead]==false)
@@ -2878,10 +2812,10 @@ public UpdateGameMode()
 					    	
 					    }
 					}
-					if(Stadt[team][LuftMacht] > Stadt[enemy][LuftMacht])
+					if(City[team][Air_Superiority] > City[enemy][Air_Superiority])
 					{
 					    GangZoneShowForPlayer(i,gangzone,COLOR_GREEN);
-					    format(string, sizeof(string), "{6BE916} Air Superiority: %d%", Stadt[team][LuftMacht]);
+					    format(string, sizeof(string), "{6BE916} Air Superiority: %d%", City[team][Air_Superiority]);
 					    if(PlayerInfo[i][mylabel]==-1)
 						{
                             /*SetPlayerObjectMaterialText(i, PlayerInfo[i][mylabel], "SA-MP {FFFFFF}0.3{008500}e {FF8200}RC7", 0, OBJECT_MATERIAL_SIZE_256x128,\
@@ -2889,9 +2823,9 @@ public UpdateGameMode()
 						 //   SetPlayerObjectMaterialText(i, PlayerInfo[i][mylabel],string, 0, OBJECT_MATERIAL_SIZE_256x128,\"Arial", 28, 0, COLOR_GREEN, COLOR_GREEN, OBJECT_MATERIAL_TEXT_ALIGN_CENTER);
 						}
 					}
-					else if(Stadt[enemy][LuftMacht] > Stadt[team][LuftMacht])
+					else if(City[enemy][Air_Superiority] > City[team][Air_Superiority])
 					{
-					    format(string, sizeof(string), "{FF0000} Air Superiority: %d%", Stadt[team][LuftMacht]);
+					    format(string, sizeof(string), "{FF0000} Air Superiority: %d%", City[team][Air_Superiority]);
 					    if(PlayerInfo[i][mylabel]==-1)
 						{
 					       /* SetPlayerObjectMaterialText(i, PlayerInfo[i][mylabel], "SA-MP {FFFFFF}0.3{008500}e {FF8200}RC7", 0, OBJECT_MATERIAL_SIZE_256x128,\
@@ -3377,7 +3311,7 @@ public LoadMaps()
 	//
 	
 	
-	// Fabriken erste SF dann LS sowie Auﬂenposten LS
+	// Fabriken erste SF dann LS sowie Auﬂenposten LS (Translated): Factories in LS and SF + the very first outpost in SF (tower)
     CreateDynamicObject(1463,-81.2000000,-1573.3000000,1.9000000,0.0000000,0.0000000,0.0000000); //object(dyn_woodpile2) (1)
 	CreateDynamicObject(1280,-78.8000000,-1573.4000000,2.0000000,0.0000000,0.0000000,0.0000000); //object(parkbench1) (1)
 	CreateDynamicObject(1280,-84.2000000,-1573.6000000,2.0000000,0.0000000,0.0000000,184.2500000); //object(parkbench1) (2)
@@ -3405,39 +3339,6 @@ public OnPlayerLeaveDynamicCP(playerid, checkpointid)
 }
 
 
-ocmd:myteam(playerid,params[])
-{
-    new string[100];
-    format(string,sizeof(string),"{6BE916}You're in Team %d or %s",GetPlayerTeam(playerid),GetTeamName(GetPlayerTeam(playerid)));
-    SendClientMessage(playerid,-1,string);
- //   GangZoneShowForAll(gangzone,COLOR_GREY);
-    //new veh = GetPlayerVehicleID(playerid);
-    new Float:px,Float:py,Float:pz;
-
-	GetPlayerPos(playerid,px,py,pz);
-  //  if(veh != INVALID_VEHICLE_ID && IsVehicleInWater(veh)) return SCM(playerid,COLOR_ORANGE,"Vehicle in Water.");
-    SetPlayerObjectMaterialText(playerid, PlayerInfo[playerid][mylabel],string, 0, OBJECT_MATERIAL_SIZE_256x128,"Arial", 28, 0, 0xF60000F6, 0xF60000F6, OBJECT_MATERIAL_TEXT_ALIGN_CENTER);
-    return 1;
-}
-
-
-ocmd:focus(playerid,params[])
-{
-	if(PlayerInfo[playerid][pClassSelection] == false && PlayerInfo[playerid][pLoggedIn]==1){
-	SetCameraBehindPlayer(playerid);}
-    return 1;
-}
-
-ocmd:adminteleport(playerid,params[])
-{
-    if(PlayerInfo[playerid][pClassSelection] == false && PlayerInfo[playerid][pLoggedIn]==1){
-    new Random;
-    Random = random(sizeof(LSSpawns));
-   	SetPlayerPos(playerid, LSSpawns[Random][0], LSSpawns[Random][1], LSSpawns[Random][2]);
-   	SetPlayerFacingAngle(playerid, LSSpawns[Random][3]);}
-    return 1;
-}
-
 stock GivePlayerMoneySave(playerid,money)
 {
 	ResetPlayerMoney(playerid);
@@ -3459,23 +3360,7 @@ stock Stats(playerid)
 	return 0;
 }
 
-ocmd:stats(playerid,params[])
-{
-	if(PlayerInfo[playerid][pLoggedIn]==0) return SCM(playerid,COLOR_RED,"You are not logged in!");
-	Stats(playerid);
-	return 1;
-}
 
-ocmd:help(playerid,params[])
-{
-	if(PlayerInfo[playerid][pLoggedIn]==0) return SCM(playerid,COLOR_RED,"You are not logged in!");
-	SCM(playerid,-1,"HELP-COMMANDS: /focus /myteam /stats /help");
-	if(PlayerInfo[playerid][pAdmin]!=0)
-	{
-	    SCM(playerid,-1,"Admin: HELP-COMMANDS: /kick /ban /setadmin /gethere /veh /adminteleport(useless)");
-	}
-	return 1;
-}
 
 stock getFreeBomb()
 {
@@ -3487,13 +3372,11 @@ stock getFreeBomb()
 }
 stock DropBomb(playerid,art)
 {
-	SCM(playerid,-1,"Funktion aufgerufen, 1");
     new i = GetVehicleVehicleInfo(GetPlayerVehicleID(playerid));
-    
     if(VehicleInfo[i][bombs] <1) return 0;
     new id = getFreeBomb();
 	if(id == -1) return SCM(playerid,COLOR_RED,"Couldn't drop a Bomb!");
-    // art 0 = 1x bombe, art 1 = 3er Bombe
+    // art 0 = 1x bomb, art 1 = 3er Bomb
     if(art == 1)
     {
         if(VehicleInfo[i][bombs] <3) return 0;
@@ -3523,7 +3406,7 @@ stock DropBomb(playerid,art)
 	        PlayerZ = PlayerZ - 1;
 			BombSystem[id][localBomb] = CreateDynamicObject(1636,PlayerX,PlayerY,PlayerZ,0,0,0);
 
-			GetXYInFrontOfPlayer(playerid,PlayerX,PlayerY,howfar);
+			GetXYInFrontOfPlayer(playerid,PlayerX,PlayerY,debug_howfar);
 
 	        new Float:rx, Float:ry, Float:rz;
 	        GetDynamicObjectRot(BombSystem[id][localBomb],rx,ry,rz);
@@ -3531,7 +3414,7 @@ stock DropBomb(playerid,art)
 	     
 
 
-			new movetime = MoveDynamicObject(BombSystem[id][localBomb],PlayerX,PlayerY,Height,speed);
+			new movetime = MoveDynamicObject(BombSystem[id][localBomb],PlayerX,PlayerY,Height,debug_speed);
 
             DroppingBombs[playerid] = 1;
             
@@ -3595,38 +3478,10 @@ public UpdateObjects()
 	        new Float:rx, Float:ry, Float:rz;
             GetDynamicObjectRot(BombSystem[i][localBomb],rx,ry,rz);
             
-            SetDynamicObjectRot(BombSystem[i][localBomb],rx+rotationfloat,ry+rotationfloat,rz+rotationfloat);
+            SetDynamicObjectRot(BombSystem[i][localBomb],rx+debug_rotationfloat,ry+debug_rotationfloat,rz+debug_rotationfloat);
 		}
 	}
 }
-
-ocmd:speed(playerid,params[])
-{
-	new speedy;
-	if(sscanf(params,"d",speedy))return SendClientMessage(playerid,-1,"/speed (geschwindigkeit)");
-	
-	speed = speedy;
-	return 1;
-}
-
-ocmd:howfar(playerid,params[])
-{
-	new speedy;
-	if(sscanf(params,"d",speedy))return SendClientMessage(playerid,-1,"/howfar (how far xy)");
-
-	howfar = speedy;
-	return 1;
-}
-
-ocmd:rotation(playerid,params[])
-{
-	new Float:speedy;
-	if(sscanf(params,"f",speedy))return SendClientMessage(playerid,-1,"/rotation (welche rotationin float!)");
-
-	rotationfloat = speedy;
-	return 1;
-}
-
 
 stock GetXYInFrontOfPlayer(playerid, &Float:x, &Float:y, Float:distance)
 {
@@ -3670,5 +3525,180 @@ public HideBox(playerid)
  	PlayerTextDrawHide(playerid, PlayerBox[playerid]);
  	PlayerInfo[playerid][pBoxShown]=false;
  	return 1;
+}
+//
+
+
+
+
+//OCMD COMMANDS
+
+ocmd:stats(playerid,params[])
+{
+	if(PlayerInfo[playerid][pLoggedIn]==0) return SCM(playerid,COLOR_RED,"You are not logged in!");
+	Stats(playerid);
+	return 1;
+}
+
+ocmd:help(playerid,params[])
+{
+	if(PlayerInfo[playerid][pLoggedIn]==0) return SCM(playerid,COLOR_RED,"You are not logged in!");
+	SCM(playerid,-1,"HELP-COMMANDS: /focus /myteam /stats /help");
+	if(PlayerInfo[playerid][pAdmin]!=0)
+	{
+	    SCM(playerid,-1,"Admin: HELP-COMMANDS: /kick /ban /setadmin /gethere /veh /adminteleport(useless)");
+	}
+	return 1;
+}
+
+
+ocmd:myteam(playerid,params[])
+{
+    new string[100];
+    format(string,sizeof(string),"{6BE916}You're in Team %d or %s",GetPlayerTeam(playerid),GetTeamName(GetPlayerTeam(playerid)));
+    SendClientMessage(playerid,-1,string);
+
+    new Float:px,Float:py,Float:pz;
+
+	GetPlayerPos(playerid,px,py,pz);
+  //  if(veh != INVALID_VEHICLE_ID && IsVehicleInWater(veh)) return SCM(playerid,COLOR_ORANGE,"Vehicle in Water.");
+    SetPlayerObjectMaterialText(playerid, PlayerInfo[playerid][mylabel],string, 0, OBJECT_MATERIAL_SIZE_256x128,"Arial", 28, 0, 0xF60000F6, 0xF60000F6, OBJECT_MATERIAL_TEXT_ALIGN_CENTER);
+    return 1;
+}
+
+
+ocmd:focus(playerid,params[])
+{
+	if(PlayerInfo[playerid][pClassSelection] == false && PlayerInfo[playerid][pLoggedIn]==1){
+	SetCameraBehindPlayer(playerid);}
+    return 1;
+}
+
+
+// DEBUG COMMANDS ( TEMPORARY ) explainations on the top!
+
+ocmd:speed(playerid,params[])
+{
+	new speedy;
+	if(sscanf(params,"d",speedy))return SendClientMessage(playerid,-1,"/speed (set speed)");
+
+	debug_speed = speedy;
+	return 1;
+}
+
+ocmd:howfar(playerid,params[])
+{
+	new speedy;
+	if(sscanf(params,"d",speedy))return SendClientMessage(playerid,-1,"/howfar (how far xy)");
+
+	debug_howfar = speedy;
+	return 1;
+}
+
+ocmd:rotation(playerid,params[])
+{
+	new Float:speedy;
+	if(sscanf(params,"f",speedy))return SendClientMessage(playerid,-1,"/rotation (which rotation?)");
+
+	debug_rotationfloat = speedy;
+	return 1;
+}
+
+
+
+//
+
+
+
+
+// Admin Commands
+ocmd:gethere(playerid,params[])
+{
+	new pid;
+	if(!IsPlayerAdminEx(playerid,1))return SCM(playerid,COLOR_RED,"You are not permitted.");
+	if(sscanf(params,"u",pid))return SendClientMessage(playerid,-1,"/gethere[playerid]");
+	new Float:px,Float:py,Float:pz;
+
+	GetPlayerPos(playerid,px,py,pz);
+
+	SetPlayerPos(pid,px+1,py,pz);
+	return 1;
+}
+
+ocmd:setadmin(playerid,params[])
+{
+	if(!IsPlayerAdmin(playerid))return SCM(playerid,COLOR_RED,"You are no RCON-Admin!");
+	new pid,admin,string[100];
+	if(sscanf(params,"ud",pid,admin))return SendClientMessage(playerid,-1,"/setadmin [playerid][Admin]");
+	PlayerInfo[pid][pAdmin]=admin;
+
+	format(string,sizeof(string),"%s is now Admin-Level %d",GetName(pid),admin);
+	SCM(playerid,COLOR_GREEN,string);
+	format(string,sizeof(string),"You were setted to Admin-Level %d by Administrator %s",admin,GetName(playerid));
+	SCM(pid,COLOR_GREEN,string);
+	return 1;
+}
+
+ocmd:kick(playerid,params[])
+{
+    new pid,reason[128],string[128];
+    if(!IsPlayerAdminEx(playerid,1))return SCM(playerid,COLOR_RED,"You are not permitted.");
+    if(sscanf(params,"us",pid,reason))return SendClientMessage(playerid,-1,"/kick [playerid][Reason]");
+    if(strlen(reason) > 50) return SCM(playerid,COLOR_LIGHTRED,"Max: 50 Letters!");
+
+	if(PlayerInfo[pid][pAdmin]>=PlayerInfo[playerid][pAdmin]) return SCM(playerid,COLOR_LIGHTRED,"You can't kick Admins on your Level!");
+	format(string,sizeof(string),"[SYSTEM]: Adminstrator %s kicked %s, Reason: %s",GetName(playerid),GetName(pid),reason);
+	SendClientMessageToAll(COLOR_GREEN,string);
+	Kick(pid);
+	return 1;
+}
+ocmd:ban(playerid,params[])
+{
+    new pid,reason[128],string[128],days,zeitdauer,zeitbann;
+    if(!IsPlayerAdminEx(playerid,2))return SCM(playerid,COLOR_RED,"You are not permitted.");
+    if(sscanf(params,"usd",pid,reason,days))return SendClientMessage(playerid,-1,"/ban [playerid][Reason][Days] [UNLIMITED = 999]");
+    if(strlen(reason) > 50) return SCM(playerid,COLOR_LIGHTRED,"Max: 50 Letters!");
+	if(PlayerInfo[pid][pLoggedIn]==0)return SCM(playerid,COLOR_LIGHTRED,"Error: Player not Logged In, Ban wouldn't have any Effect.");
+	if(PlayerInfo[pid][pAdmin]>=PlayerInfo[playerid][pAdmin]) return SCM(playerid,COLOR_LIGHTRED,"You can't Ban Admins on your Level!");
+	format(string,sizeof(string),"[SYSTEM]: Adminstrator %s banned %s for %i Days, Reason: %s",GetName(playerid),GetName(pid),days,reason);
+	zeitdauer = gettime()+(60*60*24*days);
+	if(days == 999)
+	{
+		zeitbann = 1;
+		format(string,sizeof(string),"[SYSTEM]: Adminstrator %s permanently %s banned %s, Reason: %s",GetName(playerid),GetName(pid),reason);
+	}
+	BanUser(pid,GetName(playerid),reason,zeitdauer,zeitbann);
+	SendClientMessageToAll(COLOR_LIGHTRED,string);
+	return 1;
+}
+
+ocmd:veh(playerid,params[])
+{
+    if(PlayerInfo[playerid][pClassSelection] == false && PlayerInfo[playerid][pLoggedIn]==1)
+    {
+		new vehid, color1,color2;
+		if(!IsPlayerAdminEx(playerid,1))return SCM(playerid,COLOR_RED,"You are not permitted.");
+		if(sscanf(params,"iii",vehid,color1,color2))return SendClientMessage(playerid,COLOR_LIGHTRED,"Use: /veh [vehicleID][Color1][Color2]");
+
+		new Float: X, Float: Y, Float: Z,Float:A;
+
+		GetPlayerPos(playerid,X,Y,Z);
+		GetPlayerFacingAngle(playerid,A);
+		new car = CreateVehicle(vehid,X,Y,Z,A,color1,color2,-1);
+		PutPlayerInVehicle(playerid,car,0);
+		return 1;
+	}
+	return 1;
+}
+
+
+ocmd:adminteleport(playerid,params[])
+{
+    if(PlayerInfo[playerid][pClassSelection] == false && PlayerInfo[playerid][pLoggedIn]==1){
+    new Random;
+    Random = random(sizeof(LSSpawns));
+   	SetPlayerPos(playerid, LSSpawns[Random][0], LSSpawns[Random][1], LSSpawns[Random][2]);
+   	SetPlayerFacingAngle(playerid, LSSpawns[Random][3]);}
+    return 1;
 }
 //
