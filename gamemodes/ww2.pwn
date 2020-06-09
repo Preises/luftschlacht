@@ -136,6 +136,7 @@ new DroppingBombs[MAX_PLAYERS];
 
 #define MIN_PLAYERS_TOPLAY 1
 
+#define MAX_ZONES 158
 
 
 // COLORS
@@ -316,6 +317,31 @@ enum BombenSystemYo{
 
 new BombSystem[100][BombenSystemYo];
 
+
+
+
+
+enum GangZoneEnum
+{
+	ZoneID,
+	ZoneArt,
+	Float:minx,
+	Float:miny,
+	Float:maxx,
+	Float:maxy,
+	DominatedBy,
+	ZoneName[24],
+	ZoneActive,
+	Text3D:CaptureLabel,
+	FlagPickup,
+	Zone_CP,
+	resource,
+	resourceAmount,
+	LocalZone
+}
+
+new GangZones[MAX_ZONES][GangZoneEnum];
+
 public OnGameModeInit()
 {
 //	SetGameModeText("Deathmatch");
@@ -324,10 +350,20 @@ public OnGameModeInit()
 	
 	SetTimer("UpdateObjects",120,1);
 	
+	
+	SetTimer("LoopThrewAllPlayers",1000,1);
+	
 	MapAndreas_Init(2);
 	for(new i = 0; i<sizeof(BombSystem); i++)
 	{
 	    BombSystem[i][bombid] = -1;
+	}
+	
+	for(new id=0; id<MAX_ZONES; id++)
+	{
+	    GangZones[id][FlagPickup]=-1;
+	    GangZones[id][CaptureLabel]=Text3D:-1;
+	    GangZones[id][ZoneID] = -1;
 	}
 	
 
@@ -346,6 +382,7 @@ public OnGameModeInit()
 	MySQL_SetupConnection();
 	LoadMaps();
 	PrepareGameMode();
+	LoadGangZones();
 
 	
 
@@ -411,8 +448,8 @@ public OnGameModeInit()
 
 
 
-	//gangzone = GangZoneCreate(-493.5156,-722.0081, 468.2704,-1483.7155);
-	gangzone = GangZoneCreate(-493.5156,-722.0081, 1026.8051,-2109.3525);
+
+//	gangzone = GangZoneCreate(-493.5156,-722.0081, 1026.8051,-2109.3525);
 
 
 
@@ -2556,7 +2593,26 @@ public Restart()
 }
 
 
-
+forward LoopThrewAllPlayers();
+public LoopThrewAllPlayers()
+{
+    for(new i = GetPlayerPoolSize(); i != -1; --i)
+    {
+	        if(IsPlayerConnected(i))
+	        {
+	            if(GetPlayerTeam(i) !=255)
+	            {
+	                for(new id=0; id<MAX_ZONES; id++)
+					{
+					    if(GangZones[id][LocalZone] != -1)
+					    {
+							GangZoneShowForPlayer(i,GangZones[id][LocalZone],COLOR_RED);
+						}
+					}
+	            }
+			}
+	}
+}
 
 
 
@@ -3403,7 +3459,7 @@ stock DropBomb(playerid,art)
 		
 
 
-	        PlayerZ = PlayerZ - 1;
+	        PlayerZ = PlayerZ - 1.5;
 			BombSystem[id][localBomb] = CreateDynamicObject(1636,PlayerX,PlayerY,PlayerZ,0,0,0);
 
 			GetXYInFrontOfPlayer(playerid,PlayerX,PlayerY,debug_howfar);
@@ -3526,9 +3582,133 @@ public HideBox(playerid)
  	PlayerInfo[playerid][pBoxShown]=false;
  	return 1;
 }
+
+
+forward LoadGangZones();
+public LoadGangZones()
+{
+    new query[128];
+
+
+    format(query,sizeof(query),"SELECT * FROM `GangZones`");
+
+    mysql_pquery(handle, query, "LoadGangZones2");
+    return 1;
+}
+forward LoadGangZones2();
+public LoadGangZones2()
+{
+    new rows;
+    cache_get_row_count(rows);
+    new id;
+	if(rows)
+	{
+	    for(new i; i<rows; i++)
+    	{
+    	    cache_get_value_name_int(i, "zoneid", id);
+
+            cache_get_value_name_int(i, "zoneid", GangZones[id][ZoneID]);
+
+            cache_get_value_name_int(i, "ZoneArt", GangZones[id][ZoneArt]);
+            
+            cache_get_value_name_int(i, "ZoneActive", GangZones[id][ZoneActive]);
+            
+            cache_get_value_name_int(i, "DominatedBy", GangZones[id][DominatedBy]);
+
+            cache_get_value_name(i, "ZoneName", GangZones[id][ZoneName],128);
+
+            cache_get_value_name_float(i, "minx", GangZones[id][minx]);
+	     	cache_get_value_name_float(i, "miny", GangZones[id][miny]);
+	     	cache_get_value_name_float(i, "maxx", GangZones[id][maxx]);
+	     	cache_get_value_name_float(i, "maxy", GangZones[id][maxy]);
+	     	
+	     	
+	        if(GangZones[id][ZoneActive]){updateGangZone(id);}
+		}
+		return 1;
+	}
+	return 1;
+}
+
+
+updateGangZone(id) //continue?
+{
+//    new string[128];
+	if(GangZones[id][FlagPickup] != -1)
+	{
+		DestroyPickup(GangZones[id][FlagPickup]);
+	}
+	if(GangZones[id][CaptureLabel] != Text3D:-1)
+	{
+		DestroyDynamic3DTextLabel(GangZones[id][CaptureLabel]);
+	}
+
+
+    new Float:CenterX, Float:CenterY,Float:CenterZ;
+    
+    
+    CenterX = (GangZones[id][minx] + GangZones[id][maxx]) / 2; // thx to itsmaho and Syno
+    
+    CenterY = (GangZones[id][miny] + GangZones[id][maxy]) / 2;
+    
+   	MapAndreas_FindZ_For2DCoord(CenterX, CenterY, CenterZ);
+   	
+   	printf("CenterX: %f, CenterY: %f, CenterZ: %f",CenterX,CenterY,CenterZ);
+	GangZones[id][Zone_CP]=CreateDynamicCP(CenterX, CenterY, CenterZ, 2.0);
+
+	new text[256];
+
+	if(GangZones[id][DominatedBy]==0)
+	{
+		format(text,sizeof(text), "{B18904}Dominated by Nobody. Enter to invade\nSpecial resource: %s, amount: %d", GetResourceName(GangZones[id][resource]),GangZones[id][resourceAmount]);
+		GangZones[id][CaptureLabel]=CreateDynamic3DTextLabel(text, -1, CenterX, CenterY, CenterZ, 10);
+	}
+	else
+  	{
+		format(text,sizeof(text), "{B18904}Dominated by Team %s. Enter to invade\nSpecial resource: %s, amount: %d", GetTeamName(GangZones[id][DominatedBy]),GetResourceName(GangZones[id][resource]),GangZones[id][resourceAmount]);
+		GangZones[id][CaptureLabel]=CreateDynamic3DTextLabel(text, -1, CenterX, CenterY, CenterZ, 10);
+ 	}
+
+	if(GangZones[id][ZoneID] != -1)
+	{
+ 		GangZones[id][LocalZone]=GangZoneCreate(GangZones[id][minx], GangZones[id][miny], GangZones[id][maxx], GangZones[id][maxy]);
+	}
+	return 1;
+}
 //
 
-
+stock GetResourceName(resourceid)
+{
+	new string[20];
+	switch (resourceid)
+	{
+	    case 0:
+	    {
+	        string = "Nothing";
+		}
+	    case 1:
+	    {
+	        string = "Manpower";
+		}
+		case 2:
+	    {
+	        string = "Artillery";
+		}
+		case 3:
+	    {
+	        string = "Airplanes";
+		}
+		case 4:
+	    {
+	        string = "Tanks";
+		}
+	 	default:
+		{
+		    string = "Unknown";
+		}
+	}
+	return string;
+}
 
 
 //OCMD COMMANDS
