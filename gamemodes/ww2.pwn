@@ -574,10 +574,34 @@ public OnPlayerConnect(playerid)
 	  
 	  
 	  //
+	  
+	  
+    for(new id=0; id<MAX_ZONES; id++)
+	{
+ 		if(GangZones[id][LocalZone] != -1)
+ 		{
+			GangZoneShowForPlayer(playerid,GangZones[id][LocalZone],GetTeamColor(GangZones[id][DominatedBy]));
+		}
+	}
 	return 1;
 }
 
-
+stock GetTeamColor(teamid)
+{
+	new color;
+	switch (teamid)
+	{
+	    case 1:
+	    {
+	        color = 0xAA3333AA;
+		}
+		case 2:
+		{
+		    color = 0x33CCFFAA;
+		}
+	}
+	return color;
+}
 
 public OnPlayerDisconnect(playerid, reason)
 {
@@ -2477,10 +2501,23 @@ stock SpawnAll()
 
 public OnPlayerEnterDynamicCP(playerid, checkpointid)
 {
-	if(Server[LandGefecht]==false) return 1;
-	if(Server[PreparePhase2]==true) return 1;
+	
+	new string[100];
+	
+	for(new id=0; id<MAX_ZONES; id++)
+	{
+ 		if(GangZones[id][LocalZone] == checkpointid)
+ 		{
+			format(string,sizeof(string),"[SERVER] Checkpoint ID %d, Name %s",GangZones[id][ZoneID],GangZones[id][ZoneName]);
+			SendClientMessageToAll(COLOR_YELLOW,string);
+		}
+	}
+	
+	
 	for(new i=0; i<MAX_CAPTURE_POINTS;i++)
 	{
+	    if(Server[LandGefecht]==false) return 1;
+		if(Server[PreparePhase2]==true) return 1;
 	    if(Capture[i][cpid]==checkpointid)
 	    {
 			if(GetPlayerTeam(playerid)==255) return 1;
@@ -2519,6 +2556,8 @@ public OnPlayerEnterDynamicCP(playerid, checkpointid)
 			}
 		}
 	}
+	
+	
 	return 1;
 }
 
@@ -2591,7 +2630,7 @@ public Restart()
 {
 	SendRconCommand("gmx");
 }
-
+/*
 
 forward LoopThrewAllPlayers();
 public LoopThrewAllPlayers()
@@ -2614,7 +2653,7 @@ public LoopThrewAllPlayers()
 	}
 }
 
-
+*/
 
 forward UpdateGameMode();
 public UpdateGameMode()
@@ -3654,7 +3693,7 @@ updateGangZone(id) //continue?
    	MapAndreas_FindZ_For2DCoord(CenterX, CenterY, CenterZ);
    	
    	printf("CenterX: %f, CenterY: %f, CenterZ: %f",CenterX,CenterY,CenterZ);
-	GangZones[id][Zone_CP]=CreateDynamicCP(CenterX, CenterY, CenterZ, 2.0);
+	GangZones[id][Zone_CP]=CreateDynamicCP(CenterX, CenterY, CenterZ, 1.0);
 
 	new text[256];
 
@@ -3881,4 +3920,9 @@ ocmd:adminteleport(playerid,params[])
    	SetPlayerFacingAngle(playerid, LSSpawns[Random][3]);}
     return 1;
 }
+/*
+ocmd:getzoneid(playerid,params[])
+{
+
+}*/
 //
