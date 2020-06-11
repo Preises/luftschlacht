@@ -35,3 +35,6 @@ ITB CompuPhase	Developer of the PAWN Editor and basic includes
 
 pBlueG MySQL plugin
 
+Kaliber Kleines Mörser Skript
+
+Gammix Flying Camera
