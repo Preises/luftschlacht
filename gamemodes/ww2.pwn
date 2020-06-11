@@ -8,8 +8,9 @@
 #include<crashdetect>
 #include <JunkBuster>
 #include <mapandreas>
-
 #include <mysql_info>
+#include <flyCameraByGammix>
+#include<morserScript>
 
 main()
 {
@@ -39,6 +40,7 @@ new Text:TDEditor_TD[3];
 new startcounter;
 new gangzone;
 new updater;
+new miniumScore_pilot = 0;
 new Float:debug_speed = 40.0; // How fast are the bomb objects moving?
 
 new debug_howfar = 75; // how far from the Players Forward Position are the bombs being dropped in a bomber.
@@ -77,7 +79,7 @@ new Float:SFSpawns[][] =
     {-335.7329,-1407.1595,15.9292,264.2113}, // SF 8
     {-339.5097,-1419.8730,17.6816,268.7234}//
 };
-
+/*
 
 new Float:LSEnemySpawn[][] = // Für SF
 {
@@ -106,7 +108,7 @@ new Float:SFEnemySpawn[][] = // Für LS
     {-268.7184,-1524.3331,5.1300,48.1098}, //
     {-276.5608,-1529.2139,5.3357,38.7097},//
     {-284.3905,-1533.3843,6.8339,38.7097}
-};
+};*/
 
 // Player Variables
 
@@ -249,7 +251,11 @@ enum pDataEnum
 	pTutorial,
 	pAdmin,
 	bool:pIPBanCheck,
-	bool:pBoxShown
+	bool:pBoxShown,
+	pJob,  // Job 0 = Soldier, Job 1 = Pilot, Job 2 = Tank Driver, Job 3 = Supply Deliverer
+	Float:pTargetArtPos_X,
+	Float:pTargetArtPos_Y,
+	Float:pTargetArtPos_Z
 }
 new PlayerInfo[MAX_PLAYERS][pDataEnum];
 
@@ -297,7 +303,8 @@ new Capture[MAX_CAPTURE_POINTS][CapturePoints];
 
 enum VehicleEnum{
 	teamidd,
-	vehtype,
+	vehType,
+	neededJob,
 	LocalID,
 	bombs
 }
@@ -337,10 +344,49 @@ enum GangZoneEnum
 	Zone_CP,
 	resource,
 	resourceAmount,
-	LocalZone
+	LocalZone,
+	bool:beingCaptured,
+	beingCapturedTime, // max 100
+	playerCapturerID
 }
 
 new GangZones[MAX_ZONES][GangZoneEnum];
+
+
+
+
+enum ArtillerySystem{
+
+	artid,
+	artLocalID,
+	artListID,
+	Float:Art_PositonX,
+	Float:Art_PositonY,
+	Float:Art_PositonZ,
+	Float:Art_RotationX,
+	Float:Art_RotationY,
+	Float:Art_RotationZ,
+	Float:TargetPointX,
+	Float:TargetPointY,
+	Float:TargetPointZ,
+	shootHofOften, // getimme
+	ammuNition,
+	bool: activeShooting
+}
+
+new Artillery[10][ArtillerySystem];
+
+
+
+
+enum ProjetileSystem{
+
+	p_id,
+	p_objectID
+	
+}
+
+new ProjectTile[325][ProjetileSystem];
 
 public OnGameModeInit()
 {
@@ -365,30 +411,70 @@ public OnGameModeInit()
 	    GangZones[id][CaptureLabel]=Text3D:-1;
 	    GangZones[id][ZoneID] = -1;
 	}
+	for(new i = 0; i<sizeof(Artillery);i++)
+	{
+	    Artillery[i][artid]=-1;
+	    
+	    
+	    Artillery[i][TargetPointX] = -357.2592;
+	    Artillery[i][TargetPointY] = -1408.0635;
+	    Artillery[i][TargetPointZ] = 25.7266;
+	    
+	}
 	
-
-	AddPlayerClass(61,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	for(new i = 0; i<sizeof(ProjectTile);i++)
+	{
+	    ProjectTile[i][p_id]=-1;
+	}
+// Soldier Class 
 	AddPlayerClass(12,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
-	AddPlayerClass(65,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
-	AddPlayerClass(112,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(287,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(291,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
 	AddPlayerClass(193,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
-	AddPlayerClass(150,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
-	AddPlayerClass(97,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(299,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(206,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
 	AddPlayerClass(217,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
-	AddPlayerClass(199,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
-    AddPlayerClass(250,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
-	AddPlayerClass(296,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(218,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+    AddPlayerClass(296,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+
+
+
+
+
+	// Tank Driver
+
+	AddPlayerClass(250,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(234,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(226,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+
+	// Supply Driver
+
+	AddPlayerClass(261,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(235,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(206,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(202,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+
+
+	// Pilots 
+
+
+	AddPlayerClass(255,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(253,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	
+	
+	
 	
 	MySQL_SetupConnection();
 	LoadMaps();
 	PrepareGameMode();
 	LoadGangZones();
+ 	LoadArtillerys();
 
 	
 
 	
 	// Team SF CPS
-	Capture[0][cpid] = CreateDynamicCP(-365.0519,-1420.4594,25.7266, 8.0,-1, -1, -1, 100.0,-1, 0); // San Fierro Checkpoints (Team 2)
+/*	Capture[0][cpid] = CreateDynamicCP(-365.0519,-1420.4594,25.7266, 8.0,-1, -1, -1, 100.0,-1, 0); // San Fierro Checkpoints (Team 2)
     Capture[1][cpid] = CreateDynamicCP(-298.4463,-1423.2028,13.7179, 8.0,-1, -1, -1, 100.0,-1, 0);
     Capture[2][cpid] = CreateDynamicCP(-389.4870,-1446.4491,34.0547, 8.0,-1, -1, -1, 100.0,-1, 0);
     Capture[3][cpid] = CreateDynamicCP(-91.8136,-1171.1531,2.3813, 8.0,-1, -1, -1, 100.0,-1, 0);
@@ -409,7 +495,7 @@ public OnGameModeInit()
     Capture[4][Effect] = CreateObject(18728,211.4802,-1759.1700,4.4693,0,0,0);
     Capture[5][Effect] = CreateObject(18728,260.5986,-1761.8623,13.8516,0,0,0);
     Capture[6][Effect] = CreateObject(18728,257.8129,-1818.9976,4.0854,0,0,0);
-    Capture[7][Effect] = CreateObject(18728,535.1077,-1812.5867,6.5713,0,0,0);
+    Capture[7][Effect] = CreateObject(18728,535.1077,-1812.5867,6.5713,0,0,0);*/
     
     
     
@@ -619,32 +705,6 @@ public OnPlayerSpawn(playerid)
 	    SCM(playerid,COLOR_GREEN,"Welcome to LUFTSCHLACHT! The Game is being prepared...");
 	    return 1;
 	}
- 	if(Server[PreparePhase2]==true)
- 	{
- 	    SCM(playerid,COLOR_GREEN,"[SERVER]: Land Invasion is being prepared");
-		switch(Server[EtappenWinner])
-		{
-		    case 1:
-		    {
-                SetPlayerCameraPos(playerid,-438.1381,-1269.4170,62.3346);
-		        SetPlayerCameraLookAt(playerid,-200.5445,-1444.2096,18.8280);
-			}
-			case 2:
-		    {
-		        SetPlayerCameraPos(playerid,94.4531,-1813.5541,22.3650);
-		        SetPlayerCameraLookAt(playerid,304.3058,-1817.2843,18.0186);
-			}
-		}
-		//DestroyAllPlanes();
-		SCM(playerid,COLOR_GREEN,"[SERVER]: Destroying Planes...");
- 	    PlayerTextDrawHide(playerid,TDEditor_PTD[playerid]);
-		TextDrawHideForPlayer(playerid,TDEditor_TD[0]); // testweise raus
-        SCM(playerid,COLOR_GREEN,"[SERVER]: Hiding Textlabels...");
-        
-    //    Server[PreparePhase2]=false;
- 	    return 1;
- 	}
- 	
  	if(PlayerInfo[playerid][pTutorial]==1)
  	{
  	    new sstring[512];
@@ -668,31 +728,6 @@ public OnPlayerSpawn(playerid)
 		return 1;
 	}
 	 
-
-/*    if(Server[ModeStarted]==true)
-    {
-        new Random;
-        switch(GetPlayerTeam(playerid))
-        {
-            case 1:
-            {
-                Random = random(sizeof(LSSpawns));
-	        	SetPlayerPos(playerid, LSSpawns[Random][0], LSSpawns[Random][1], LSSpawns[Random][2]);
-	        	SetPlayerFacingAngle(playerid, LSSpawns[Random][3]);
-	        	SetPlayerColor(playerid,COLOR_YELLOW);
-			}
-			case 2:
-            {
-                Random = random(sizeof(SFSpawns));
-	        	SetPlayerPos(playerid, SFSpawns[Random][0], SFSpawns[Random][1], SFSpawns[Random][2]);
-	        	SetPlayerFacingAngle(playerid, SFSpawns[Random][3]);
-	        	SetPlayerColor(playerid,COLOR_BLUE);
-			}
-		}
-		SetPlayerVirtualWorld(playerid,0);
-		TextDrawShowForPlayer(playerid,TDEditor_TD[0]);
-		SetPlayerInterior(playerid,0);
-	}*/
 	if(PlayerInfo[playerid][pClassSelection] == false)
 	{
 
@@ -718,142 +753,92 @@ public OnPlayerSpawn(playerid)
 			new string[64],team = GetPlayerTeam(playerid);
 			format(string,sizeof(string),"You joined the Team %s",GetTeamName(team));
 			SendClientMessage(playerid,COLOR_GOLD,string);
-			//PlayerInfo[playerid][SpswnProtected]=1;
 			if(Server[LandGefecht]==true)
 			{
 				SetTimerEx("SpawnKillEnd", 8000, 0,"i",playerid);
 			}
 			SetPlayerWorldBounds(playerid, 1027.9858, -488.1284, -728.1127, -2107.9824);
+			
+			new Random;
+			switch(GetPlayerTeam(playerid))
+   			{
+   			    
+      			case 1:
+         		{
+           			Random = random(sizeof(LSSpawns));
+		        	SetPlayerPos(playerid, LSSpawns[Random][0], LSSpawns[Random][1], LSSpawns[Random][2]);
+		        	SetPlayerFacingAngle(playerid, LSSpawns[Random][3]);
+		        	SetPlayerColor(playerid,COLOR_YELLOW);
+				}
+				case 2:
+    			{
+    				Random = random(sizeof(SFSpawns));
+       				SetPlayerPos(playerid, SFSpawns[Random][0], SFSpawns[Random][1], SFSpawns[Random][2]);
+		        	SetPlayerFacingAngle(playerid, SFSpawns[Random][3]);
+		        	SetPlayerColor(playerid,COLOR_BLUE);
+				}
+			}
+
 		}
 		if(PlayerInfo[playerid][pDead]==true)
 		{
             PlayerInfo[playerid][pDead] = false;
 		}
-		/*	
-		if(PlayerInfo[playerid][pDead]==true)
+		switch(PlayerInfo[playerid][pJob])
 		{
-            SetPlayerPos(playerid,PlayerInfo[playerid][DeadPosX],PlayerInfo[playerid][DeadPosY],PlayerInfo[playerid][DeadPosZ]);
-            
-            SetPlayerInterior(playerid,0);
-            SetPlayerVirtualWorld(playerid,0);
-            
-            
-            SetCameraBehindPlayer(playerid);
-            ApplyAnimation(playerid,"PED","KO_skid_front",4.1,0,1,1,1,0);
-           	TogglePlayerControllable(playerid,false);
-	 		ApplyAnimation(playerid,"PED","KO_skid_front",4.1,0,1,1,1,0);
-      //      SetTimerEx("SpawnTimer", 6000, 0,"i",playerid);
-       //     SCM(playerid,-1,"Du bist als Toter gespawnt.");
-            return 1;
-		}*/
-		if(Server[ModeStarted]==true && Server[LandGefecht]==true)
-	    {
-	        new Random,stepwinners = Server[EtappenWinner],team=GetPlayerTeam(playerid);
-	        switch(team)
-	        {
-	            case 1:
-	            {
-	                if(team != stepwinners)
-	                {
-		                Random = random(sizeof(LSSpawns));
-			        	SetPlayerPos(playerid, LSSpawns[Random][0], LSSpawns[Random][1], LSSpawns[Random][2]);
-			        	SetPlayerFacingAngle(playerid, LSSpawns[Random][3]);
-			        	SetPlayerColor(playerid,COLOR_YELLOW);
-			        	SCM(playerid,COLOR_LIGHTRED,"Defend your Territory against the Attackers!");
-					}
-					else
-					{
-					    Random = random(sizeof(SFEnemySpawn));
-			        	SetPlayerPos(playerid, SFEnemySpawn[Random][0], SFEnemySpawn[Random][1], SFEnemySpawn[Random][2]);
-			        	SetPlayerFacingAngle(playerid, SFEnemySpawn[Random][3]);
-			        	SetPlayerColor(playerid,COLOR_YELLOW);
-			        	SCM(playerid,COLOR_LIGHTRED,"Capture the Enemys Checkpoints!");
-					    
-					}
-				}
-				case 2:
-	            {
-	                if(team != stepwinners)
-	                {
-		                Random = random(sizeof(SFSpawns));
-			        	SetPlayerPos(playerid, SFSpawns[Random][0], SFSpawns[Random][1], SFSpawns[Random][2]);
-			        	SetPlayerFacingAngle(playerid, SFSpawns[Random][3]);
-			        	SetPlayerColor(playerid,COLOR_BLUE);
-			        	SCM(playerid,COLOR_LIGHTRED,"Defend your Territory against the Attackers!");
-					}
-					else
-					{
-					    Random = random(sizeof(LSEnemySpawn));
-			        	SetPlayerPos(playerid, LSEnemySpawn[Random][0], LSEnemySpawn[Random][1], LSEnemySpawn[Random][2]);
-			        	SetPlayerFacingAngle(playerid, LSEnemySpawn[Random][3]);
-			        	
-			        	SetPlayerColor(playerid,COLOR_YELLOW);
-			        	SCM(playerid,COLOR_LIGHTRED,"Capture the Enemys Checkpoints!");
-
-					}
-				}
+		    case 0:  // foot Soldier
+		    {
+		        SetSpawnReady(playerid);
+		        ResetPlayerWeapons(playerid);
+				GivePlayerWeapon(playerid,4,1);
+				GivePlayerWeapon(playerid,24,999);
+				GivePlayerWeapon(playerid,25,999);
+				GivePlayerWeapon(playerid,31,999);
+				GivePlayerWeapon(playerid,34,10);
 			}
-			SetCameraBehindPlayer(playerid);
-			SetPlayerVirtualWorld(playerid,0);
-			SetPlayerInterior(playerid,0);
-		//	PlayerInfo[playerid][SpswnProtected]=1;
-			TogglePlayerControllable(playerid,true);
-			if(PlayerInfo[playerid][SpswnProtected]==0)
+			
+			case 1: //Pilot
 			{
-				SetTimerEx("SpawnKillEnd", 8000, 0,"i",playerid);
+			    SetSpawnReady(playerid);
+			    ResetPlayerWeapons(playerid);
+			    GivePlayerWeapon(playerid,24,999);
+			    SCM(playerid,COLOR_RED,"[SEARCHING PLANE] We're looking for a free Plane for you...");
+				SetTimerEx("FindPlaneInterval",4000,0,"i",playerid);
 			}
-			PlayerTextDrawHide(playerid,TDEditor_PTD[playerid]);
-			TextDrawHideForPlayer(playerid,TDEditor_TD[0]); // testweise raus (unschuldig)
-			TextDrawShowForPlayer(playerid,TDEditor_TD[1]);
 	
-			
-			ResetPlayerWeapons(playerid);
-			GivePlayerWeapon(playerid,4,1);
-			GivePlayerWeapon(playerid,24,999);
-			GivePlayerWeapon(playerid,25,999);
-			GivePlayerWeapon(playerid,31,999);
-			GivePlayerWeapon(playerid,34,10);
-			return 1;
+	        case 2: // Tank Driver
+	        {
+	            SetSpawnReady(playerid);
+	            ResetPlayerWeapons(playerid);
+			    GivePlayerWeapon(playerid,24,999);
+			    SCM(playerid,COLOR_RED,"[SEARCHING TANK] We're looking for a free Tank for you...");
+				SetTimerEx("FindTankInterval",4000,0,"i",playerid);
+			}
+			case 3:
+			{
+			    SetSpawnReady(playerid);
+			    ResetPlayerWeapons(playerid);
+				GivePlayerWeapon(playerid,9,1);
+				GivePlayerWeapon(playerid,22,999);
+				GivePlayerWeapon(playerid,25,999);
+				SCM(playerid,COLOR_GREEN,"[SUPPLY DELIVERER] Get in a Truck!");
+			}
 		}
-		else if(Server[LandGefecht]==false && Server[PreparePhase2]==false)
-		{
-		   /* new veh = GetFreePlane(playerid);
-		    if(veh == INVALID_VEHICLE_ID)return SCM(playerid,COLOR_LIGHTRED,"There was no free Plane found. Retrying in 10 Seconds..."); // COOLRED genutzt mal xD LOL SOL LANGE WTF
-			PutPlayerInVehicle(playerid,veh,0);*/
-
-			PlayerInfo[playerid][CarReady]=false;
-			// FlugZeug Symbol
-			SCM(playerid,COLOR_RED,"We're looking for a free Plane for you...");
-			SetTimerEx("FourSeconds",4000,0,"i",playerid);
-			TextDrawHideForPlayer(playerid,TDEditor_TD[2]); // Zeit Einnahme
-			TextDrawHideForPlayer(playerid,TDEditor_TD[1]); // Capture Flag
-			PlayerTextDrawHide(playerid,TeamCapturePoints[playerid]);
-			TextDrawShowForPlayer(playerid,TDEditor_TD[0]);
-		//	if(PlayerInfo[playerid][pDead]==false)
-		//	{
-			    new Random;
-		        switch(GetPlayerTeam(playerid))
-		        {
-		            case 1:
-		            {
-		                Random = random(sizeof(LSSpawns));
-			        	SetPlayerPos(playerid, LSSpawns[Random][0], LSSpawns[Random][1], LSSpawns[Random][2]);
-			        	SetPlayerFacingAngle(playerid, LSSpawns[Random][3]);
-			        	SetPlayerColor(playerid,COLOR_YELLOW);
-					}
-					case 2:
-		            {
-		                Random = random(sizeof(SFSpawns));
-			        	SetPlayerPos(playerid, SFSpawns[Random][0], SFSpawns[Random][1], SFSpawns[Random][2]);
-			        	SetPlayerFacingAngle(playerid, SFSpawns[Random][3]);
-			        	SetPlayerColor(playerid,COLOR_BLUE);
-					}
-				}
-		//	}
-			
-			
-		}
+		
 	}
+	return 1;
+}
+
+stock SetSpawnReady(playerid)
+{
+    SetCameraBehindPlayer(playerid);
+	SetPlayerVirtualWorld(playerid,0);
+	SetPlayerInterior(playerid,0);
+	PlayerTextDrawHide(playerid,TDEditor_PTD[playerid]);
+	TextDrawHideForPlayer(playerid,TDEditor_TD[0]); // testweise raus (unschuldig)
+	TextDrawShowForPlayer(playerid,TDEditor_TD[1]);
+	TogglePlayerControllable(playerid,true);
+			
 	return 1;
 }
 /*
@@ -971,10 +956,17 @@ public SetInvalidDriver(vehicle)
 }
 
 
-forward FourSeconds(playerid);
-public FourSeconds(playerid)
+forward FindPlaneInterval(playerid);
+public FindPlaneInterval(playerid)
 {
     PutPlayerInPlane(playerid);
+    TogglePlayerControllable(playerid,true);
+}
+
+forward FindTankInterval(playerid);
+public FindTankInterval(playerid)
+{
+    PutPlayerInTank(playerid);
     TogglePlayerControllable(playerid,true);
 }
 forward SAMPRespawnVehicle(vehicle);
@@ -1011,7 +1003,7 @@ public PutPlayerInPlane(playerid)
     new veh = GetFreePlane(playerid);
     if(veh == INVALID_VEHICLE_ID)
 	{
-		SCM(playerid,COLOR_LIGHTRED,"There was no free Plane found. Retrying in 5 Seconds..."); // COOLRED genutzt mal xD LOL SOL LANGE WTF
+		SCM(playerid,COLOR_LIGHTRED,"[SEARCHING PLANE] There was no free Plane found. Retrying in 5 Seconds..."); // COOLRED genutzt mal xD LOL SOL LANGE WTF
 		SetTimerEx("Repeat",5000,0,"i",playerid);
 		return 1;
 	}
@@ -1019,6 +1011,26 @@ public PutPlayerInPlane(playerid)
 	PlayerInfo[playerid][CarReady]=true;
 	return 1;
 }
+forward PutPlayerInTank(playerid);
+public PutPlayerInTank(playerid)
+{
+	if(Server[LandGefecht]==true) return 1;
+	if(IsPlayerInAnyVehicle(playerid)) return 1;
+    new veh = GetFreeTank(playerid);
+    if(veh == INVALID_VEHICLE_ID)
+	{
+		SCM(playerid,COLOR_LIGHTRED,"[SEARCHING TANK] There was no free Tank found. Retrying in 5 Seconds..."); // COOLRED genutzt mal xD LOL SOL LANGE WTF
+		SetTimerEx("Repeat",5000,0,"i",playerid);
+		return 1;
+	}
+	PutPlayerInVehicle(playerid,veh,0);
+	PlayerInfo[playerid][CarReady]=true;
+	return 1;
+}
+
+
+
+
 forward Repeat(playerid);
 public Repeat(playerid)
 {
@@ -1106,7 +1118,7 @@ stock GetFreePlane(playerid)
 	{
 		if(i!=INVALID_VEHICLE_ID)
 		{
-		    if(i == VehicleInfo[i][LocalID] && !IsVehicleOccupied(i))
+		    if(i == VehicleInfo[i][LocalID] && !IsVehicleOccupied(i) && VehicleInfo[i][neededJob] == GetPlayerJob(playerid))
 		    {
 		        new Float:health;
 			    GetVehicleHealth(VehicleInfo[i][LocalID], health);
@@ -1123,6 +1135,39 @@ stock GetFreePlane(playerid)
 		}
 	}
 	return INVALID_VEHICLE_ID;
+}
+
+
+stock GetFreeTank(playerid)
+{
+	new team = GetPlayerTeam(playerid);
+	for(new i = 0; i < MAX_VEHICLES; i++)
+	{
+		if(i!=INVALID_VEHICLE_ID)
+		{
+		    if(i == VehicleInfo[i][LocalID] && !IsVehicleOccupied(i) && VehicleInfo[i][neededJob] == GetPlayerJob(playerid))
+		    {
+		        new Float:health;
+			    GetVehicleHealth(VehicleInfo[i][LocalID], health);
+		        if(VehicleInfo[i][teamidd] == team && health >= 1000)
+		        {
+					new Float: vPosX, Float:vPosY,Float:vPosZ;
+					GetVehiclePos(VehicleInfo[i][LocalID],vPosX,vPosY,vPosZ);
+					if(IsPointInRangeOfPoint(vPosX,vPosY,vPosZ,286.9475,-1804.6365,5.0574,30.0) || IsPointInRangeOfPoint(vPosX,vPosY,vPosZ,-327.0711,-1424.0215,14.8314,30.0))
+					{
+		            	return VehicleInfo[i][LocalID];
+					}
+				}
+			}
+		}
+	}
+	return INVALID_VEHICLE_ID;
+}
+
+
+stock GetPlayerJob(playerid)
+{
+	return PlayerInfo[playerid][pJob];
 }
 stock IsPointInRangeOfPoint(Float:x, Float:y, Float:z, Float:x2, Float:y2, Float:z2, Float:range)
 {
@@ -1285,6 +1330,15 @@ stock PrepareGameMode()
 	VehicleInfo[24][teamidd]= 2;
 	
 	
+	for(new v = 0; v<25; v++)
+	{
+	    if(GetVehicleModel(VehicleInfo[v][LocalID]) == 476)
+	    {
+			VehicleInfo[v][neededJob] = 1;// for Pilots
+		}
+	}
+	
+	
 	
 	// LS Barracks + Panzer
 	
@@ -1308,6 +1362,17 @@ stock PrepareGameMode()
     VehicleInfo[28][teamidd]= 2;
 	VehicleInfo[29][teamidd]= 2;
 	VehicleInfo[30][teamidd]= 2;
+	
+	
+	
+	
+	for(new v = 25; v<31; v++)
+	{
+	    if(GetVehicleModel(VehicleInfo[v][LocalID]) == 433)
+	    {
+			VehicleInfo[v][neededJob] = 3;// for Supply Drivers ( Barrack )
+		}
+	}
     
 
     
@@ -1365,7 +1430,7 @@ stock GetVehicleType(vehicle)
 		{
 		    if(vehicle == VehicleInfo[i][LocalID])
 		    {
-		        return VehicleInfo[i][vehtype];
+		        return VehicleInfo[i][vehType];
 			}
 		}
 	}
@@ -1413,6 +1478,7 @@ public OnPlayerDeath(playerid, killerid, reason)
 	if(killerid != INVALID_PLAYER_ID && killerid != playerid)
 	{
 	    PlayerInfo[killerid][pKills]++;
+	    PlayerInfo[killerid][pScore]++;
 	    GivePlayerMoneySave(killerid,1250);
 	    GameTextForPlayer(killerid,"FIGHT-KILL",3000,3);
 	}
@@ -1643,6 +1709,14 @@ public OnPlayerRequestSpawn(playerid)
  		SCM(playerid,COLOR_LIGHTRED,"You are not logged in!");
  		return 0;
 	}
+	new jobid = GetPlayerClassJob(playerid,GetPlayerSkin(playerid));
+	if(jobid == 3 && GetPlayerScore(playerid) < miniumScore_pilot)
+	{
+	 	SCM(playerid,COLOR_RED,"[Choosing Job] You need at least 100 XP to do this Job.");
+	 	return 0;
+	}
+	PlayerInfo[playerid][pJob] = jobid;
+	
 	PlayerInfo[playerid][pClassSelection]=false;
 //	SpawnPlayer(playerid);
 	return 1;
@@ -1713,15 +1787,12 @@ public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 	new dropbombs = GetPVarInt(playerid,"DroppingBombs");
 	if(newkeys & KEY_FIRE && dropbombs == 0)
 	{
-	    SCM(playerid,-1,"Key KEY_LOOK_BEHIND!");
 	    if(IsPlayerInAnyVehicle(playerid) && !DroppingBombs[playerid])
 	    {
-	        SCM(playerid,-1,"Key KEY_LOOK_BEHIND! Vehicle."); //KEY_WALK
 	        new veh = GetPlayerVehicleID(playerid);
 	        new model = GetVehicleModel(GetPlayerVehicleID(playerid));
 	        if(model == 476 && GetVehicleType(veh) == 0)
 	        {
-	        	SCM(playerid,-1,"yes#2");
 	        	DropBomb(playerid,1);
 		 	}
 		}
@@ -1765,6 +1836,31 @@ public OnPlayerUpdate(playerid)
 		}
 		
 		// bei aussteignne zurcüsketzen
+	}
+	
+	
+	if (g_FlyMode[playerid][flyType] == 1)
+	{
+	    new
+            Float:fPX, Float:fPY, Float:fPZ,
+            Float:fVX, Float:fVY, Float:fVZ,
+            Float:object_x, Float:object_y, Float:object_z;
+            
+        const
+            Float:fScale = 35.0;
+
+        GetPlayerCameraPos(playerid, fPX, fPY, fPZ);
+        GetPlayerCameraFrontVector(playerid, fVX, fVY, fVZ);
+        
+        object_x = fPX + floatmul(fVX, fScale);
+        object_y = fPY + floatmul(fVY, fScale);
+        object_z = fPZ + floatmul(fVZ, fScale);
+        
+        SetPlayerCheckpoint(playerid,object_x, object_y, object_z,8.0);
+        
+        PlayerInfo[playerid][pTargetArtPos_X] = object_x;
+        PlayerInfo[playerid][pTargetArtPos_Y] = object_x;
+        PlayerInfo[playerid][pTargetArtPos_Z] = object_x;
 	}
 	return 1;
 }
@@ -1964,6 +2060,8 @@ public OnUserLogin(playerid)
 		cache_get_value_name_int(0, "deaths", PlayerInfo[playerid][pDeaths]);
 		cache_get_value_name_int(0, "pTutorial", PlayerInfo[playerid][pTutorial]);
 		cache_get_value_name_int(0, "pAdmin", PlayerInfo[playerid][pAdmin]);
+		
+		SetPlayerScore(playerid,PlayerInfo[playerid][pScore]);
 		PlayerInfo[playerid][pLoggedIn]  = 1;
 		SendClientMessage(playerid, 0x00FF00FF, "[Account] You logged in.");
 		ResetPlayerMoney(playerid);
@@ -2503,17 +2601,29 @@ public OnPlayerEnterDynamicCP(playerid, checkpointid)
 {
 	
 	new string[100];
-	
 	for(new id=0; id<MAX_ZONES; id++)
 	{
- 		if(GangZones[id][LocalZone] == checkpointid)
+ 		if(GangZones[id][Zone_CP] == checkpointid)
  		{
 			format(string,sizeof(string),"[SERVER] Checkpoint ID %d, Name %s",GangZones[id][ZoneID],GangZones[id][ZoneName]);
 			SendClientMessageToAll(COLOR_YELLOW,string);
+			/*
+			if(GetPlayerTeam(playerid) != GangZones[id][DominatedBy] && !GangZones[id][beingCaptured])
+			{
+			    GangZones[id][beingCaptured] = true;
+			    GangZones[id][beingCapturedTime] = 0;
+			    GangZones[id][playerCapturerID] = playerid;
+			    
+			    if(PlayerInfo[playerid][pProgress] == INVALID_PLAYER_BAR_ID) return printf("INVALID Progressbar!");
+			 	SetPlayerProgressBarMaxValue(playerid,PlayerInfo[playerid][pProgress],100);
+				SetPlayerProgressBarValue(playerid,PlayerInfo[playerid][pProgress],GangZones[id][beingCapturedTime]);
+				UpdatePlayerProgressBar(playerid,PlayerInfo[playerid][pProgress]);
+				ShowPlayerProgressBar(playerid,PlayerInfo[playerid][pProgress]);
+			}*/
 		}
 	}
 	
-	
+	/*
 	for(new i=0; i<MAX_CAPTURE_POINTS;i++)
 	{
 	    if(Server[LandGefecht]==false) return 1;
@@ -2555,7 +2665,7 @@ public OnPlayerEnterDynamicCP(playerid, checkpointid)
 				}
 			}
 		}
-	}
+	}*/
 	
 	
 	return 1;
@@ -2630,7 +2740,7 @@ public Restart()
 {
 	SendRconCommand("gmx");
 }
-/*
+
 
 forward LoopThrewAllPlayers();
 public LoopThrewAllPlayers()
@@ -2639,21 +2749,20 @@ public LoopThrewAllPlayers()
     {
 	        if(IsPlayerConnected(i))
 	        {
-	            if(GetPlayerTeam(i) !=255)
+	            if(GetPlayerTeam(i) ==255)
 	            {
-	                for(new id=0; id<MAX_ZONES; id++)
-					{
-					    if(GangZones[id][LocalZone] != -1)
-					    {
-							GangZoneShowForPlayer(i,GangZones[id][LocalZone],COLOR_RED);
-						}
+	                if(PlayerInfo[i][pClassSelection])
+	                {
+	                    new jobid = GetPlayerClassJob(i,GetPlayerSkin(i)),string[50];
+	                    format(string,sizeof(string),"~g~%s",GetJobName(jobid));
+						GameTextForPlayer(i,string,2000,3);
 					}
 	            }
 			}
 	}
 }
 
-*/
+
 
 forward UpdateGameMode();
 public UpdateGameMode()
@@ -2683,6 +2792,14 @@ public UpdateGameMode()
 	    	SetTimer("SpawnEveryOneAndSet5SecSpawn",5000,0); // Was wenn jemand innerhalb dieser 5 Sekunde joint ?
 		}
 	}
+	
+	
+	
+	for(new i = 0; i<sizeof(Artillery);i++)
+	{
+	    FireAtillery(i);
+	}
+	/*
 	if(Server[LandGefecht]==true && Server[Prepared]==true) // true
 	{
 	    if(Server[PreparePhase2]==false)
@@ -2724,50 +2841,6 @@ public UpdateGameMode()
 	        TextDrawSetString(TDEditor_TD[2], string);
 	    }
 		
-
-
-		
-		// Mein anderes TimeSystem:
-		/*
-		if(Server[PreparePhase2]==false)
-		{
-		    Server[Sekunden]--;
-		    if(Server[Sekunden]<=1)
-		    {
-		        if(Server[Minuten] == 1)
-		        {
-		            Server[Minuten] = 0; // letzte Minute
-		            Server[Sekunden] = 59;
-		        }
-		        else if(Server[Minuten] == 0)
-		        {
-		            new stepwinner = Server[EtappenWinner];
-		            if(City[stepwinner][Captured]>2)
-		            {
-		                format(string,sizeof(string),"[END] The Attackers %s captured %d/4 Checkpoints and Won the Round!",GetTeamName(stepwinner),City[stepwinner][Captured]);
-		                SendClientMessageToAll(COLOR_GREEN,string);
-		                SetTimer("Restart",9000,0);
-		                // bis 3/4 keine Sorge man hat etwas wie punktezänlung und teamriviltItät am ende
-		            }
-		            else
-		            {
-		                if(City[stepwinner][Defended] == 0) {City[stepwinner][Defended]=4;}
-		                format(string,sizeof(string),"Team %s defended their Territory by holding %d/4 Checkpoints!",GetTeamName(GetEnemy(stepwinner)),City[stepwinner][Defended]);
-		                SendClientMessageToAll(COLOR_GREEN,string);
-		                SendClientMessageToAll(COLOR_GREEN,"The Match goes to the next Round!");
-		                KillTimer(updater);
-		                Server[Prepared]=false;
-		                SetTimer("NewRound",9000,0);
-		                // bis 3/4 keine Sorge man hat etwas wie punktezänlung und teamriviltItät am ende
-		            }
-		            return 1;
-		        }
-		        Server[Minuten]--;
-		        Server[Sekunden] = 59;
-		    }
-		    format(string, sizeof(string), "%02d:%02d", Server[Minuten],Server[Sekunden]);
-			TextDrawSetString(TDEditor_TD[2], string);
-		}*/
 		for(new cpidd=0; cpidd<MAX_CAPTURE_POINTS;cpidd++)
 		{
 		    if(Capture[cpidd][ActiveCapture]==1)
@@ -2913,8 +2986,7 @@ public UpdateGameMode()
 					    format(string, sizeof(string), "{6BE916} Air Superiority: %d%", City[team][Air_Superiority]);
 					    if(PlayerInfo[i][mylabel]==-1)
 						{
-                            /*SetPlayerObjectMaterialText(i, PlayerInfo[i][mylabel], "SA-MP {FFFFFF}0.3{008500}e {FF8200}RC7", 0, OBJECT_MATERIAL_SIZE_256x128,\
-"Arial", 28, 0, 0xFFFF8200, 0xFF000000, OBJECT_MATERIAL_TEXT_ALIGN_CENTER);*/
+                            
 						 //   SetPlayerObjectMaterialText(i, PlayerInfo[i][mylabel],string, 0, OBJECT_MATERIAL_SIZE_256x128,\"Arial", 28, 0, COLOR_GREEN, COLOR_GREEN, OBJECT_MATERIAL_TEXT_ALIGN_CENTER);
 						}
 					}
@@ -2923,9 +2995,7 @@ public UpdateGameMode()
 					    format(string, sizeof(string), "{FF0000} Air Superiority: %d%", City[team][Air_Superiority]);
 					    if(PlayerInfo[i][mylabel]==-1)
 						{
-					       /* SetPlayerObjectMaterialText(i, PlayerInfo[i][mylabel], "SA-MP {FFFFFF}0.3{008500}e {FF8200}RC7", 0, OBJECT_MATERIAL_SIZE_256x128,\
-"Arial", 28, 0, 0xFFFF8200, 0xFF000000, OBJECT_MATERIAL_TEXT_ALIGN_CENTER);*/
-						//    SetPlayerObjectMaterialText(i, PlayerInfo[i][mylabel],string, 0, OBJECT_MATERIAL_SIZE_256x128,\"Arial", 28, 0, COLOR_RED, COLOR_RED, OBJECT_MATERIAL_TEXT_ALIGN_CENTER);
+					      
 						}
 					    GangZoneShowForPlayer(i,gangzone,COLOR_LIGHTRED);
 					}
@@ -2943,9 +3013,7 @@ public UpdateGameMode()
 					
 	            }
 	        }
-		}
-	    
-	}
+		}*/
 	return 1;
 }
 
@@ -3417,6 +3485,16 @@ public LoadMaps()
 	CreateDynamicObject(10843,-55.2000000,-1240.6000000,10.3000000,0.0000000,0.0000000,0.0000000); //object(bigshed_sfse01) (1)
 	CreateDynamicObject(1337,534.4892600,-1859.4668000,6.1227900,0.0000000,0.0000000,0.0000000); //object(binnt07_la) (1)
 	CreateDynamicObject(10843,431.3999900,-1847.5000000,10.7000000,0.0000000,0.0000000,0.0000000); //object(bigshed_sfse01) (2)
+	
+	
+	//
+	
+	
+	
+	// Platform for Artilerry in the sea between the 2 teams
+	CreateDynamicObject(9946,-35,-1777.5,0.5,0,0,156);
+	
+	//
 }
 
 public OnPlayerLeaveDynamicCP(playerid, checkpointid)
@@ -3576,6 +3654,44 @@ public UpdateObjects()
             SetDynamicObjectRot(BombSystem[i][localBomb],rx+debug_rotationfloat,ry+debug_rotationfloat,rz+debug_rotationfloat);
 		}
 	}
+	
+	
+	
+	for(new id=0; id<MAX_ZONES; id++)
+	{
+	    if(GangZones[id][ZoneID] != -1 && GangZones[id][beingCaptured])
+	    {
+	        GangZones[id][beingCapturedTime]++;
+	        if(GangZones[id][beingCapturedTime]>=100)
+	        {
+	            GangZones[id][DominatedBy] = GetEnemy(GangZones[id][DominatedBy]);
+	           // updateAllGangZones();
+	           
+	            if(GangZones[id][playerCapturerID] != INVALID_PLAYER_ID && IsPlayerConnected(GangZones[id][playerCapturerID]))
+	            {
+	                new playerid = GangZones[id][playerCapturerID];
+	                SetPlayerProgressBarValue(playerid,PlayerInfo[playerid][pProgress],GangZones[id][beingCapturedTime]);
+	            	UpdatePlayerProgressBar(playerid,PlayerInfo[playerid][pProgress]);
+				}
+	            GangZoneShowForAll(id,GetTeamColor(GangZones[id][DominatedBy]));
+	            break;
+			}
+		}
+	}
+	
+//	beingCapturedTime
+}
+
+
+stock updateAllGangZones()
+{
+	for(new id=0; id<MAX_ZONES; id++)
+	{
+	    if(GangZones[id][ZoneID] != -1)
+	    {
+	        updateGangZone(id);
+	    }
+	}
 }
 
 stock GetXYInFrontOfPlayer(playerid, &Float:x, &Float:y, Float:distance)
@@ -3614,6 +3730,109 @@ stock ShowPlayerBox(playerid,textbox[],interval)
 	return 1;
 }
 
+
+/*
+	AddPlayerClass(12,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(287,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(291,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(193,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(299,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClss(206,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(217,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(218,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+    AddPlayerClass(296,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+
+
+
+
+
+	// Tank Driver 11 - 13
+
+	AddPlayerClass(250,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(234,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(226,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+
+	// Supply Driver 234 206 14-18
+
+	AddPlayerClass(261,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(235,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(206,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(202,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+
+
+	// Pilots 255 253
+
+
+	AddPlayerClass(255,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+	AddPlayerClass(253,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
+*/
+
+stock GetPlayerClassJob(playerid,skinid)
+{
+	new job;
+	
+	if(skinid==12 ||skinid==287 ||skinid==291 ||skinid==193 ||skinid==299 ||skinid==206 ||skinid==217 ||skinid== 218||skinid==296) { job = 0;} //soldier
+
+	if(skinid==250 || skinid==234 ||skinid==226) { job = 2;} // tank driver
+	
+	if(skinid==261 ||skinid==235 ||skinid==206 ||skinid==202) { job = 3;} // supply driver
+	
+	if(skinid==255 ||skinid==253) { job = 1;} // pilot
+	
+	return job;
+}
+
+stock GetJobName(jobid)
+{
+	new name[16];
+	switch(jobid)
+	{
+	    case 0:
+	    {
+	        name="Soldier";
+		}
+		case 1:
+	    {
+	        name="Pilot";
+		}
+		case 2:
+	    {
+	        name="Tank Driver";
+		}
+		case 3:
+	    {
+	        name="Supply Driver";
+		}
+	}
+	return name;
+}
+/*
+stock GetPlayerClassJob(playerid,skinid)
+{
+		new job;
+		switch(classid)
+		{
+		    case 0 .. 10:
+		    {
+		        job = 0; // soldier
+			}
+			case 11 .. 13:
+		    {
+		        job = 2; // tank driver
+			}
+			case 14 .. 18:
+		    {
+		        job = 3; // supply deliverer
+			}
+			case 19 .. 20:
+		    {
+		        job = 1; // pilot
+			}
+		}
+		return job;
+}*/
+	
+	
 forward HideBox(playerid);
 public HideBox(playerid)
 {
@@ -3681,6 +3900,15 @@ updateGangZone(id) //continue?
 	{
 		DestroyDynamic3DTextLabel(GangZones[id][CaptureLabel]);
 	}
+/*	if(GangZones[id][Zone_CP] != -1)
+	{
+	    DestroyDynamicCP(GangZones[id][Zone_CP]);
+	  //  GangZones[id][Zone_CP] = -1;
+	}
+	if(IsValidDynamicCP(GangZones[id][LocalZone]))
+	{
+	    GangZoneDestroy(GangZones[id][LocalZone]);
+	}*/
 
 
     new Float:CenterX, Float:CenterY,Float:CenterZ;
@@ -3692,7 +3920,7 @@ updateGangZone(id) //continue?
     
    	MapAndreas_FindZ_For2DCoord(CenterX, CenterY, CenterZ);
    	
-   	printf("CenterX: %f, CenterY: %f, CenterZ: %f",CenterX,CenterY,CenterZ);
+   	printf("CenterX: %f, CenterY: %f, CenterZ: %f, LocalZone: %d, GangZone: %d",CenterX,CenterY,CenterZ,GangZones[id][LocalZone],GangZones[id][Zone_CP],GangZones[id][LocalZone]);
 	GangZones[id][Zone_CP]=CreateDynamicCP(CenterX, CenterY, CenterZ, 1.0);
 
 	new text[256];
@@ -3712,8 +3940,119 @@ updateGangZone(id) //continue?
 	{
  		GangZones[id][LocalZone]=GangZoneCreate(GangZones[id][minx], GangZones[id][miny], GangZones[id][maxx], GangZones[id][maxy]);
 	}
+	
+	GangZoneShowForAll(GangZones[id][LocalZone],GetTeamColor(GangZones[id][DominatedBy]));
 	return 1;
 }
+
+forward LoadArtillerys();
+public LoadArtillerys()
+{
+    new query[128];
+
+
+    format(query,sizeof(query),"SELECT * FROM `Artillery`");
+
+    mysql_pquery(handle, query, "LoadArtillerys2");
+    return 1;
+}
+
+
+forward LoadArtillerys2();
+public LoadArtillerys2()
+{
+    new rows;
+    cache_get_row_count(rows);
+    new id;
+	if(rows)
+	{
+	    for(new i; i<rows; i++)
+    	{
+    	    new ar_id = FindFreeId();
+	
+	        if(ar_id == -1) return printf("Couldn't load row %d (ARTILLERY), Reason: Limit reached.",i);
+	        
+	        Artillery[id][artid] = id;
+    	    cache_get_value_name_int(i, "ListID", Artillery[id][artListID]);
+
+            cache_get_value_name_float(i, "Art_PositonX", Artillery[ar_id][Art_PositonX]);
+	     	cache_get_value_name_float(i, "Art_PositonY", Artillery[ar_id][Art_PositonY]);
+	     	cache_get_value_name_float(i, "Art_PositonZ", Artillery[ar_id][Art_PositonZ]);
+	     	
+	     	cache_get_value_name_float(i, "Art_RotationX", Artillery[ar_id][Art_RotationX]);
+	     	cache_get_value_name_float(i, "Art_RotationY", Artillery[ar_id][Art_RotationY]);
+	     	cache_get_value_name_float(i, "Art_RotationZ", Artillery[ar_id][Art_RotationZ]);
+	     	
+	     	
+	     	Artillery[ar_id][activeShooting] = false;
+	     	
+	     	Artillery[ar_id][artLocalID] = CreateDynamicObject(3267,Artillery[ar_id][Art_PositonX],Artillery[ar_id][Art_PositonY],Artillery[ar_id][Art_PositonZ],Artillery[ar_id][Art_RotationX],Artillery[ar_id][Art_RotationY],Artillery[ar_id][Art_RotationZ]);
+
+		}
+		return 1;
+	}
+	printf("Artillerys loaded: %d", rows);
+	return 1;
+}
+
+
+
+
+public OnMissileFinished(Float:x,Float:y,Float:z)
+{
+    CreateExplosion(x,y,z,2,20); //explosion
+    return 1;
+}
+
+
+
+forward FireAtillery(artilleryid);
+public FireAtillery(artilleryid)
+{
+	if(artilleryid != -1)
+	{
+    	new id = findFreeProjectile();
+    	if(id == -1) return 0;
+
+    	ProjectTile[id][p_objectID] = StartMissile(Artillery[artilleryid][Art_PositonX],Artillery[artilleryid][Art_PositonY],Artillery[artilleryid][Art_PositonZ]+1, Artillery[artilleryid][TargetPointX],Artillery[artilleryid][TargetPointY],Artillery[artilleryid][TargetPointZ]);
+ 	}
+ 	return 1;
+}
+
+/*/
+artid,
+	artLocalID,
+	Float:Art_PositonX,
+	Float:Art_PositonY,
+	Float:Art_PositonZ,
+	Float:Art_RotationX,
+	Float:Art_RotationY,
+	Float:Art_RotationZ,
+	Float:TargetPointX,
+	Float:TargetPointY,
+	Float:TargetPointZ,
+
+*/
+
+stock FindFreeId()
+{
+	for(new i = 0; i<sizeof(Artillery);i++)
+	{
+	    if(Artillery[i][artid]==-1)return i;
+	}
+	return -1;
+}
+
+stock findFreeProjectile()
+{
+	for(new i = 0; i<sizeof(ProjectTile);i++)
+	{
+	    if(ProjectTile[i][p_id]==-1)return i;
+	}
+	return -1;
+}
+
+
 //
 
 stock GetResourceName(resourceid)
@@ -3823,6 +4162,16 @@ ocmd:rotation(playerid,params[])
 	return 1;
 }
 
+ocmd:testoommand(playerid,params[])   // can be changed everytime ( DEBUG COMMAND TO TEST ARTILLERY TARGET )
+{
+    SetPlayerCamera(playerid, 1);
+    return 1;
+}
+ocmd:testoommand2(playerid,params[])   // can be changed everytime ( DEBUG COMMAND TO TEST ARTILLERY TARGET )
+{
+    SetPlayerCamera(playerid, 0);
+    return 1;
+}
 
 
 //
@@ -3920,6 +4269,39 @@ ocmd:adminteleport(playerid,params[])
    	SetPlayerFacingAngle(playerid, LSSpawns[Random][3]);}
     return 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /*
 ocmd:getzoneid(playerid,params[])
 {
