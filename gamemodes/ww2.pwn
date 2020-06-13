@@ -27,7 +27,8 @@ enum
     DIALOG_LOGIN,
     DIALOG_BAN,
     DIALOG_TUTORIAL,
-    DIALOG_STATS
+    DIALOG_STATS,
+    DIALOG_CONFIG_ARTILLERY
     
 }
 
@@ -142,6 +143,7 @@ new DroppingBombs[MAX_PLAYERS];
 
 
 // COLORS
+#define COOLRED 0xFF0000FF
 #define COLOR_BLUE 0x0000BBAA
 #define COLOR_LIGHTRED 0xFB0000AA
 #define COLOR_PURPLE 0xC2A2DAAA
@@ -255,7 +257,8 @@ enum pDataEnum
 	pJob,  // Job 0 = Soldier, Job 1 = Pilot, Job 2 = Tank Driver, Job 3 = Supply Deliverer
 	Float:pTargetArtPos_X,
 	Float:pTargetArtPos_Y,
-	Float:pTargetArtPos_Z
+	Float:pTargetArtPos_Z,
+	bool:IsConfiguringArtillery
 }
 new PlayerInfo[MAX_PLAYERS][pDataEnum];
 
@@ -369,9 +372,11 @@ enum ArtillerySystem{
 	Float:TargetPointX,
 	Float:TargetPointY,
 	Float:TargetPointZ,
-	shootHofOften, // getimme
+	shootHowOften, // getimme
 	ammuNition,
-	bool: activeShooting
+	bool: activeShooting,
+	bool: isEnabled,
+	dominatedByTeam
 }
 
 new Artillery[10][ArtillerySystem];
@@ -415,12 +420,12 @@ public OnGameModeInit()
 	{
 	    Artillery[i][artid]=-1;
 	    
-	    
-	    Artillery[i][TargetPointX] = -357.2592;
+	    Artillery[i][ammuNition]=10000;   // standard default and local default should be configurable by an admin
+	   /* Artillery[i][TargetPointX] = -357.2592;
 	    Artillery[i][TargetPointY] = -1408.0635;
-	    Artillery[i][TargetPointZ] = 25.7266;
-	    
+	    Artillery[i][TargetPointZ] = 25.7266;*/
 	}
+
 	
 	for(new i = 0; i<sizeof(ProjectTile);i++)
 	{
@@ -566,6 +571,11 @@ public OnGameModeInit()
 public OnGameModeExit()
 {
     mysql_close(handle);
+    
+    for(new i=0; i<MAX_OBJECTS;i++)
+    {
+        DestroyDynamicObject(i);
+	}
 	return 1;
 }
 
@@ -677,11 +687,11 @@ stock GetTeamColor(teamid)
 	new color;
 	switch (teamid)
 	{
-	    case 1:
+	    case 1: // LS
 	    {
 	        color = 0xAA3333AA;
 		}
-		case 2:
+		case 2: //SF
 		{
 		    color = 0x33CCFFAA;
 		}
@@ -1766,7 +1776,13 @@ public OnPlayerInteriorChange(playerid, newinteriorid, oldinteriorid)
 {
 	return 1;
 }
-
+stock Float:GetDistanceBetweenPoints3D(Float:x1,Float:y1,Float:z1,Float:x2,Float:y2,Float:z2){
+    return VectorSize(x1-x2,y1-y2,z1-z2);
+}
+stock Float:GetDistanceBetweenPoints(Float:x1f,Float:y1f,Float:z1f,Float:x2f,Float:y2f,Float:z2f)
+{
+	return floatadd(floatadd(floatsqroot(floatpower(floatsub(x1f,x2f),2)),floatsqroot(floatpower(floatsub(y1f,y2f),2))),floatsqroot(floatpower(floatsub(z1f,z2f),2)));
+}
 public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 {
 	if(newkeys & KEY_HANDBRAKE)
@@ -1784,6 +1800,34 @@ public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 		 	}
 		}
 	}
+	if(newkeys & KEY_SECONDARY_ATTACK)
+	{
+ 		if(PlayerInfo[playerid][IsConfiguringArtillery])
+		{
+		    new arte_id = GetPVarInt(playerid,"ArtilleryID");
+			printf("Arte ID KEY_SECONDAR_ATTACK : %d", arte_id);
+		    if(arte_id == -1)
+		    {
+		        SetPlayerCamera(playerid, 0);
+		        PlayerInfo[playerid][IsConfiguringArtillery] = false;
+		        HideBox(playerid);
+		        SetPlayerPos(playerid,Artillery[arte_id][Art_PositonX]-1,Artillery[arte_id][Art_PositonY],Artillery[arte_id][Art_PositonZ]);
+			}
+			else
+			{
+			    new Float:distance = GetDistanceBetweenPoints3D(Artillery[arte_id][Art_PositonX],Artillery[arte_id][Art_PositonY],Artillery[arte_id][Art_PositonZ],PlayerInfo[playerid][pTargetArtPos_X],PlayerInfo[playerid][pTargetArtPos_Y],PlayerInfo[playerid][pTargetArtPos_Z]);
+
+			    if(distance < 60.0 || distance > 500.0) return SCM(playerid,COOLRED,"[Select Target] The Artillery can't reach this point (Range: 60m-500m)");
+				Artillery[arte_id][TargetPointX] = PlayerInfo[playerid][pTargetArtPos_X];
+	        	Artillery[arte_id][TargetPointY] = PlayerInfo[playerid][pTargetArtPos_Y];
+	        	Artillery[arte_id][TargetPointZ] = PlayerInfo[playerid][pTargetArtPos_Z];
+	        	HideBox(playerid);
+	        	SetPlayerCamera(playerid, 0);
+		        PlayerInfo[playerid][IsConfiguringArtillery] = false;
+		        SetPlayerPos(playerid,Artillery[arte_id][Art_PositonX]-1,Artillery[arte_id][Art_PositonY],Artillery[arte_id][Art_PositonZ]);
+			}
+		}
+	}
 	new dropbombs = GetPVarInt(playerid,"DroppingBombs");
 	if(newkeys & KEY_FIRE && dropbombs == 0)
 	{
@@ -1795,6 +1839,22 @@ public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 	        {
 	        	DropBomb(playerid,1);
 		 	}
+		}
+	}
+	
+	if(newkeys & KEY_FIRE && GetPlayerState(playerid == PLAYER_STATE_ONFOOT))
+	{
+	    for(new i = 0; i<sizeof(Artillery);i++)
+		{
+			if(Artillery[i][artid]!=-1)
+	    	{
+	    	    if(IsPlayerInRangeOfPoint(playerid,6.0,Artillery[i][Art_PositonX],Artillery[i][Art_PositonY],Artillery[i][Art_PositonZ]))
+		        {
+		            SetPVarInt(playerid,"ArtilleryID",i);
+		            printf("Arte ID KEYFIRE : %d", i);
+		            ShowPlayerDialog(playerid,DIALOG_CONFIG_ARTILLERY,DIALOG_STYLE_LIST,"Configure Artillery","Set Target Position\nStart/Stop","Execute","Exit");
+		    	}
+			}
 		}
 	}
 	return 1;
@@ -1821,13 +1881,13 @@ public OnPlayerUpdate(playerid)
 	
 	if(dropbombs > 0)
 	{
-	    printf("DEBUG: EINS: Spieler %s, dropbombs: %d, droptime: %f,gettime: %d, Fahrzeug: %i",GetName(playerid),dropbombs, droptime,gettime(), i);
+	   // printf("DEBUG: EINS: Spieler %s, dropbombs: %d, droptime: %f,gettime: %d, Fahrzeug: %i",GetName(playerid),dropbombs, droptime,gettime(), i);
 		if(VehicleInfo[i][LocalID]!=INVALID_VEHICLE_ID)
 		{
-		    printf("DEBUG: ZWEI: Spieler %s, dropbombs: %d, droptime: %f, gettime: %d Fahrzeug: %i",GetName(playerid),dropbombs, droptime,gettime(), i);
+		  //  printf("DEBUG: ZWEI: Spieler %s, dropbombs: %d, droptime: %f, gettime: %d Fahrzeug: %i",GetName(playerid),dropbombs, droptime,gettime(), i);
 	/*		if(gettime() > droptime)
 			{*/
-			    printf("DEBUG: DREI: Spieler %s, dropbombs: %d, droptime: %f, gettime: %d Fahrzeug: %i",GetName(playerid),dropbombs, droptime, gettime(),i);
+			  //  printf("DEBUG: DREI: Spieler %s, dropbombs: %d, droptime: %f, gettime: %d Fahrzeug: %i",GetName(playerid),dropbombs, droptime, gettime(),i);
    				DropBomb(playerid,0);
    				droptime = gettime()+1;
    				
@@ -1839,7 +1899,7 @@ public OnPlayerUpdate(playerid)
 	}
 	
 	
-	if (g_FlyMode[playerid][flyType] == 1)
+	if (g_FlyMode[playerid][flyType] == 1 && PlayerInfo[playerid][IsConfiguringArtillery])
 	{
 	    new
             Float:fPX, Float:fPY, Float:fPZ,
@@ -1859,8 +1919,10 @@ public OnPlayerUpdate(playerid)
         SetPlayerCheckpoint(playerid,object_x, object_y, object_z,8.0);
         
         PlayerInfo[playerid][pTargetArtPos_X] = object_x;
-        PlayerInfo[playerid][pTargetArtPos_Y] = object_x;
-        PlayerInfo[playerid][pTargetArtPos_Z] = object_x;
+        PlayerInfo[playerid][pTargetArtPos_Y] = object_y;
+        PlayerInfo[playerid][pTargetArtPos_Z] = object_z;
+        
+        ShowPlayerBox(playerid,"Press ENTER to select a positon.",-1);
 	}
 	return 1;
 }
@@ -1934,6 +1996,37 @@ public OnVehicleStreamOut(vehicleid, forplayerid)
 
 public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 {
+	switch(dialogid)
+	{
+	    case DIALOG_CONFIG_ARTILLERY:
+	    {
+	        if(!response) return 0;
+	        new arte_id = GetPVarInt(playerid,"ArtilleryID");
+	        switch(listitem)
+	        {
+				case 0: // set target position
+				{
+				    SetPlayerCamera(playerid, 1);  // set in Flymode
+				    PlayerInfo[playerid][IsConfiguringArtillery] = true;
+				}
+				case 1:
+				{
+				    if(!Artillery[arte_id][isEnabled]) return SCM(playerid,COOLRED,"[Artillery] This Artillery is destroyed or was deactivated.");
+                    if(Artillery[arte_id][ammuNition] <=0) return SCM(playerid,COOLRED,"[Artillery] This Artillery ran out of ammu nition.");
+				    if(Artillery[arte_id][activeShooting])
+				    {
+				        Artillery[arte_id][activeShooting] = false;
+				        SCM(playerid,COLOR_GREY,"[Artillery] Artillery {FF0000}disabled");
+					}
+					else
+					{
+					    Artillery[arte_id][activeShooting] = true;
+					    SCM(playerid,COLOR_GREY,"[Artillery] Artillery {04B404}enabled");
+					}
+				}
+			}
+		}
+	}
     if(dialogid == DIALOG_TUTORIAL)
 	{
 	    if(!response) return Kick(playerid);
@@ -2129,6 +2222,9 @@ stock ResetPlayerVariables(playerid)
 	PlayerInfo[playerid][pIPBanCheck]=false;
 	
 	PlayerInfo[playerid][pBoxShown] = false;
+	PlayerInfo[playerid][IsConfiguringArtillery] = false;
+	
+	
 	
 	DroppingBombs[playerid] = 0;
 	return 1;
@@ -2599,27 +2695,32 @@ stock SpawnAll()
 
 public OnPlayerEnterDynamicCP(playerid, checkpointid)
 {
+	SCM(playerid,-1,"entered!");
 	
 	new string[100];
 	for(new id=0; id<MAX_ZONES; id++)
 	{
  		if(GangZones[id][Zone_CP] == checkpointid)
  		{
-			format(string,sizeof(string),"[SERVER] Checkpoint ID %d, Name %s",GangZones[id][ZoneID],GangZones[id][ZoneName]);
+			format(string,sizeof(string),"[SERVER] Checkpoint ID %d, Name %s, Dominated by %s",GangZones[id][ZoneID],GangZones[id][ZoneName],GetTeamName(GangZones[id][DominatedBy]));
 			SendClientMessageToAll(COLOR_YELLOW,string);
-			/*
+
 			if(GetPlayerTeam(playerid) != GangZones[id][DominatedBy] && !GangZones[id][beingCaptured])
 			{
 			    GangZones[id][beingCaptured] = true;
 			    GangZones[id][beingCapturedTime] = 0;
 			    GangZones[id][playerCapturerID] = playerid;
 			    
-			    if(PlayerInfo[playerid][pProgress] == INVALID_PLAYER_BAR_ID) return printf("INVALID Progressbar!");
-			 	SetPlayerProgressBarMaxValue(playerid,PlayerInfo[playerid][pProgress],100);
+			    printf("Capturer ID %d", GangZones[id][playerCapturerID]);
+			    
+			    if(PlayerInfo[playerid][pProgress] == INVALID_PLAYER_BAR_ID) return SCM(playerid,COOLRED,"[Server Error] INVALID Progressbar! Try again later!");
+			 	SetPlayerProgressBarMaxValue(playerid,PlayerInfo[playerid][pProgress],5);
 				SetPlayerProgressBarValue(playerid,PlayerInfo[playerid][pProgress],GangZones[id][beingCapturedTime]);
 				UpdatePlayerProgressBar(playerid,PlayerInfo[playerid][pProgress]);
 				ShowPlayerProgressBar(playerid,PlayerInfo[playerid][pProgress]);
-			}*/
+				
+
+			}
 		}
 	}
 	
@@ -2670,6 +2771,7 @@ public OnPlayerEnterDynamicCP(playerid, checkpointid)
 	
 	return 1;
 }
+
 
 forward SpawnTimer(playerid);
 public SpawnTimer(playerid)
@@ -2797,7 +2899,45 @@ public UpdateGameMode()
 	
 	for(new i = 0; i<sizeof(Artillery);i++)
 	{
-	    FireAtillery(i);
+	    FireArtillery(i);
+	}
+	
+	for(new id=0; id<MAX_ZONES; id++)
+	{
+	    if(GangZones[id][ZoneID]!=-1)
+	    {
+	        if(!GangZones[id][beingCaptured])continue;
+	        if(IsPlayerConnected(GangZones[id][playerCapturerID]) && GangZones[id][playerCapturerID]!=INVALID_PLAYER_ID)
+	        {
+        		GangZones[id][beingCapturedTime]++;
+        		new playerid = GangZones[id][playerCapturerID];
+       			SetPlayerProgressBarValue(playerid,PlayerInfo[playerid][pProgress],GangZones[id][beingCapturedTime]);
+	      		UpdatePlayerProgressBar(playerid,PlayerInfo[playerid][pProgress]);
+	      		ShowPlayerProgressBar(playerid,PlayerInfo[playerid][pProgress]);
+          		if(GangZones[id][beingCapturedTime]>=5)
+          		{
+                    GangZones[id][DominatedBy] = GetEnemy(GangZones[id][DominatedBy]);
+	      			HidePlayerProgressBar(playerid,PlayerInfo[playerid][pProgress]);
+	      			//GangZoneShowForAll(GangZones[id][LocalZone],GetTeamColor(GangZones[id][DominatedBy]));
+	      			
+					GameTextForPlayer(playerid,"~w~Zone captured~n~~g~You get $5.000",3000,3);
+					GivePlayerMoney(playerid,5000);
+				    GangZones[id][beingCapturedTime]=0;
+				    GangZones[id][playerCapturerID] = INVALID_PLAYER_ID;
+				    GangZones[id][beingCaptured] = false;
+				    
+				    updateGangZone(id);
+				}
+			}
+			else
+			{
+			    GangZoneShowForAll(id,GetTeamColor(GangZones[id][DominatedBy]));
+			    GangZones[id][beingCapturedTime]=0;
+			    GangZones[id][playerCapturerID] = INVALID_PLAYER_ID;
+			    GangZones[id][beingCaptured] = false;
+			}
+			GangZoneShowForAll(GangZones[id][LocalZone],GetTeamColor(GangZones[id][DominatedBy]));
+		}
 	}
 	/*
 	if(Server[LandGefecht]==true && Server[Prepared]==true) // true
@@ -3507,7 +3647,10 @@ public OnPlayerLeaveDynamicCP(playerid, checkpointid)
 			PlayerInfo[playerid][pInCP]=-1;
 		}
 	}
-	HidePlayerProgressBar(playerid,PlayerInfo[playerid][pProgress]);
+	if(PlayerInfo[playerid][pProgress] != INVALID_PLAYER_BAR_ID)
+	{
+		HidePlayerProgressBar(playerid,PlayerInfo[playerid][pProgress]);
+	}
 	return 1;
 }
 
@@ -3617,8 +3760,6 @@ stock IsABombObject(objid)
 }
 public OnDynamicObjectMoved(objectid)
 {
-	print("OnDynamicObjectMoved abgerufen!");
-	
 	
 	for(new i = 0; i<(sizeof(BombSystem)); i++)
 	{
@@ -3629,8 +3770,7 @@ public OnDynamicObjectMoved(objectid)
 	  		GetDynamicObjectPos(objectid,ObjPosX,ObjPosY,ObjPosZ);
 
 	  		CreateExplosion(ObjPosX,ObjPosY,ObjPosZ,0,30.0);
-
-	    //	printf("Object %d ZERSTÖRT",objectid);
+	  		
 			DestroyDynamicObject(objectid);
 			
 			BombSystem[i][bombid] = -1;
@@ -3647,7 +3787,7 @@ public UpdateObjects()
 	{
 	    if(BombSystem[i][bombid] != -1 && IsValidDynamicObject(BombSystem[i][localBomb]))
 	    {
-	        printf("Objekt %d (BOMBID: %d) geupdatet!",i,BombSystem[i][bombid]);
+	      //  printf("Objekt %d (BOMBID: %d) geupdatet!",i,BombSystem[i][bombid]);
 	        new Float:rx, Float:ry, Float:rz;
             GetDynamicObjectRot(BombSystem[i][localBomb],rx,ry,rz);
             
@@ -3656,28 +3796,6 @@ public UpdateObjects()
 	}
 	
 	
-	
-	for(new id=0; id<MAX_ZONES; id++)
-	{
-	    if(GangZones[id][ZoneID] != -1 && GangZones[id][beingCaptured])
-	    {
-	        GangZones[id][beingCapturedTime]++;
-	        if(GangZones[id][beingCapturedTime]>=100)
-	        {
-	            GangZones[id][DominatedBy] = GetEnemy(GangZones[id][DominatedBy]);
-	           // updateAllGangZones();
-	           
-	            if(GangZones[id][playerCapturerID] != INVALID_PLAYER_ID && IsPlayerConnected(GangZones[id][playerCapturerID]))
-	            {
-	                new playerid = GangZones[id][playerCapturerID];
-	                SetPlayerProgressBarValue(playerid,PlayerInfo[playerid][pProgress],GangZones[id][beingCapturedTime]);
-	            	UpdatePlayerProgressBar(playerid,PlayerInfo[playerid][pProgress]);
-				}
-	            GangZoneShowForAll(id,GetTeamColor(GangZones[id][DominatedBy]));
-	            break;
-			}
-		}
-	}
 	
 //	beingCapturedTime
 }
@@ -3708,8 +3826,6 @@ stock GetXYInFrontOfPlayer(playerid, &Float:x, &Float:y, Float:distance)
 
     x += (distance * floatsin(-a, degrees));
     y += (distance * floatcos(-a, degrees));
-    
-
 }
 
 stock ShowPlayerBox(playerid,textbox[],interval)
@@ -3722,14 +3838,18 @@ stock ShowPlayerBox(playerid,textbox[],interval)
 	if(interval !=-1) // nicht uendlich
 	{
 	    SetTimerEx("HideBox", interval*1000, false, "i", playerid);
+	    PlayerPlaySound(playerid,1084,0.0,0.0,0.0);
 	}
 	PlayerTextDrawSetString(playerid,PlayerBox[playerid],textbox);
  	PlayerTextDrawShow(playerid, PlayerBox[playerid]);
-
- 	PlayerPlaySound(playerid,1084,0.0,0.0,0.0);
+ 	
+ 	
 	return 1;
 }
-
+stock GetPointInFront2D(Float:x,Float:y,Float:rz,Float:radius,&Float:tx,&Float:ty){
+	tx = x - (radius * floatsin(rz,degrees));
+	ty = y + (radius * floatcos(rz,degrees));
+}
 
 /*
 	AddPlayerClass(12,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
@@ -3920,8 +4040,8 @@ updateGangZone(id) //continue?
     
    	MapAndreas_FindZ_For2DCoord(CenterX, CenterY, CenterZ);
    	
-   	printf("CenterX: %f, CenterY: %f, CenterZ: %f, LocalZone: %d, GangZone: %d",CenterX,CenterY,CenterZ,GangZones[id][LocalZone],GangZones[id][Zone_CP],GangZones[id][LocalZone]);
-	GangZones[id][Zone_CP]=CreateDynamicCP(CenterX, CenterY, CenterZ, 1.0);
+ //  	printf("CenterX: %f, CenterY: %f, CenterZ: %f, LocalZone: %d, GangZone: %d",CenterX,CenterY,CenterZ,GangZones[id][LocalZone],GangZones[id][Zone_CP],GangZones[id][LocalZone]);
+	GangZones[id][Zone_CP]=CreateDynamicCP(CenterX, CenterY, CenterZ, 2.0);
 
 	new text[256];
 
@@ -3972,7 +4092,7 @@ public LoadArtillerys2()
 	
 	        if(ar_id == -1) return printf("Couldn't load row %d (ARTILLERY), Reason: Limit reached.",i);
 	        
-	        Artillery[id][artid] = id;
+	        Artillery[ar_id][artid] = id;
     	    cache_get_value_name_int(i, "ListID", Artillery[id][artListID]);
 
             cache_get_value_name_float(i, "Art_PositonX", Artillery[ar_id][Art_PositonX]);
@@ -3984,9 +4104,33 @@ public LoadArtillerys2()
 	     	cache_get_value_name_float(i, "Art_RotationZ", Artillery[ar_id][Art_RotationZ]);
 	     	
 	     	
-	     	Artillery[ar_id][activeShooting] = false;
+	     	Artillery[ar_id][activeShooting] = true;
 	     	
-	     	Artillery[ar_id][artLocalID] = CreateDynamicObject(3267,Artillery[ar_id][Art_PositonX],Artillery[ar_id][Art_PositonY],Artillery[ar_id][Art_PositonZ],Artillery[ar_id][Art_RotationX],Artillery[ar_id][Art_RotationY],Artillery[ar_id][Art_RotationZ]);
+	     	Artillery[ar_id][isEnabled] = true;
+	     	
+	     	
+	     	Artillery[ar_id][dominatedByTeam] = 0; 
+	     	
+	     	Artillery[ar_id][artLocalID] = CreateDynamicObject(3267,Artillery[ar_id][Art_PositonX],Artillery[ar_id][Art_PositonY],Artillery[ar_id][Art_PositonZ]-0.5,Artillery[ar_id][Art_RotationX],Artillery[ar_id][Art_RotationY],Artillery[ar_id][Art_RotationZ]);
+	     	
+
+			new Float:GoalX,Float:GoalY,Float:GoalZ;
+			
+			GetPointInFront2D(Artillery[ar_id][Art_PositonX],Artillery[ar_id][Art_PositonY],Artillery[ar_id][Art_PositonZ],60.0,GoalX,GoalY);
+			
+			MapAndreas_FindZ_For2DCoord(GoalX, GoalY, GoalZ);
+			
+			
+			Artillery[ar_id][TargetPointX] =GoalX;
+		    Artillery[ar_id][TargetPointY] =GoalY;
+		    Artillery[ar_id][TargetPointZ] =GoalZ;
+		    
+		    
+		    SetObjectFaceCoords3D(Artillery[ar_id][artLocalID],Artillery[ar_id][TargetPointX], Artillery[ar_id][TargetPointY], Artillery[ar_id][TargetPointZ],-0.0,270.0, -355.0);  // das zweite bearbeiten
+			
+			
+			
+			
 
 		}
 		return 1;
@@ -4006,18 +4150,81 @@ public OnMissileFinished(Float:x,Float:y,Float:z)
 
 
 
-forward FireAtillery(artilleryid);
-public FireAtillery(artilleryid)
+forward FireArtillery(artilleryid);
+public FireArtillery(artilleryid)
 {
 	if(artilleryid != -1)
 	{
     	new id = findFreeProjectile();
-    	if(id == -1) return 0;
+    	new arteid = artilleryid;
+    	if(id == -1) {print("no more ids"); return 0;}
 
-    	ProjectTile[id][p_objectID] = StartMissile(Artillery[artilleryid][Art_PositonX],Artillery[artilleryid][Art_PositonY],Artillery[artilleryid][Art_PositonZ]+1, Artillery[artilleryid][TargetPointX],Artillery[artilleryid][TargetPointY],Artillery[artilleryid][TargetPointZ]);
- 	}
- 	return 1;
+
+		if(!Artillery[arteid][isEnabled]) return 0;
+		
+		if(Artillery[arteid][artLocalID] == INVALID_OBJECT_ID)
+		{
+			printf("Artillery ID %d destroyed or Invalid. Action taken: diabled",arteid);
+			Artillery[arteid][isEnabled] = false;
+			return 0;
+		}
+		
+		
+		Artillery[arteid][ammuNition]--;
+  		if(Artillery[arteid][ammuNition] <=0)
+  		{
+  		    SendTeamMessage(Artillery[arteid][dominatedByTeam],"[ARTILLERY] Artillery with ID %d was deactivated, reason: lack of ammunition");  // could be send to team 0 (nobody) doesn't matter.
+		  	Artillery[arteid][activeShooting] = false;
+		}
+		
+		if(!Artillery[arteid][activeShooting]) return 0;
+
+		
+        new Random = random(21);
+        float(Random);
+        
+        new Float:FloatValue;
+		FloatValue = float(Random);
+
+		
+    //    printf("%f",FloatValue);
+		new Random2 = random(2);
+		switch(Random2)
+		{
+		    case 0:
+		    {
+			    Artillery[arteid][TargetPointX] = Artillery[arteid][TargetPointX] + FloatValue;
+			    Artillery[arteid][TargetPointY]+=FloatValue;
+			//    printf("ID %d, Random 0: X: %f, Y: %f, Z: %f",artilleryid,Artillery[arteid][TargetPointX],Artillery[arteid][TargetPointY],Artillery[arteid][TargetPointZ]);
+			    
+			    MapAndreas_FindZ_For2DCoord(Artillery[arteid][TargetPointX], Artillery[arteid][TargetPointY], Artillery[arteid][TargetPointZ]);
+
+//			    SetObjectFaceCoords3D(Artillery[id][artLocalID],Artillery[id][TargetPointX], Artillery[id][TargetPointY], Artillery[id][TargetPointZ],0.0,0.0);
+			}
+			case 1:
+			{
+   				Artillery[arteid][TargetPointX]-=FloatValue;
+			    Artillery[arteid][TargetPointY]-=FloatValue;
+			 //   printf("ID %d, Random 1: X: %f, Y: %f, Z: %f",artilleryid,Artillery[arteid][TargetPointX],Artillery[arteid][TargetPointY],Artillery[arteid][TargetPointZ]);
+		     	MapAndreas_FindZ_For2DCoord(Artillery[arteid][TargetPointX], Artillery[arteid][TargetPointY], Artillery[arteid][TargetPointZ]);
+		     	
+		     	
+		     	
+		     	
+		     //	SetObjectFaceCoords3D(Artillery[id][artLocalID],Artillery[id][TargetPointX], Artillery[id][TargetPointY], Artillery[id][TargetPointZ],0.0,0.0);
+			    
+ 			}
+
+		}
+		
+	 //	printf("ID %d, Final Shot 1: X: %f, Y: %f, Z: %f",artilleryid,Artillery[arteid][TargetPointX],Artillery[arteid][TargetPointY],Artillery[arteid][TargetPointZ]);
+        SetObjectFaceCoords3D(Artillery[arteid][artLocalID],Artillery[arteid][TargetPointX], Artillery[arteid][TargetPointY], Artillery[arteid][TargetPointZ],-0.0,270.0, -355.0);
+		ProjectTile[id][p_objectID] = StartMissile(Artillery[arteid][Art_PositonX],Artillery[arteid][Art_PositonY],Artillery[arteid][Art_PositonZ]+1, Artillery[arteid][TargetPointX],Artillery[arteid][TargetPointY],Artillery[arteid][TargetPointZ]);
+
+	}
+	return 1;
 }
+
 
 /*/
 artid,
@@ -4088,6 +4295,23 @@ stock GetResourceName(resourceid)
 	return string;
 }
 
+
+stock SetObjectFaceCoords3D(iObject, Float: fX, Float: fY, Float: fZ, Float: fRollOffset = 0.0, Float: fPitchOffset = 0.0, Float: fYawOffset = 0.0) {  // credits to RyDeR`
+    new
+        Float: fOX,
+        Float: fOY,
+        Float: fOZ,
+        Float: fPitch
+    ;
+    GetDynamicObjectPos(iObject, fOX, fOY, fOZ);
+
+    fPitch = floatsqroot(floatpower(fX - fOX, 2.0) + floatpower(fY - fOY, 2.0));
+    fPitch = floatabs(atan2(fPitch, fZ - fOZ));
+
+    fZ = atan2(fY - fOY, fX - fOX) - 90.0; // Yaw
+
+    SetDynamicObjectRot(iObject, fRollOffset, fPitch + fPitchOffset, fZ + fYawOffset);
+}
 
 //OCMD COMMANDS
 
@@ -4274,7 +4498,24 @@ ocmd:adminteleport(playerid,params[])
 
 
 
-
+ocmd:setobjectrott(playerid,params[])
+{
+	new count,Float:fRollOffset,Float:fPitchOffset,Float:fYawOffset;
+	if(sscanf(params,"fff",fRollOffset,fPitchOffset,fYawOffset))return SendClientMessage(playerid,-1,"/setobjectrott [fRollOffset] [fPitchOffset] [fYawOffset]");
+	for(new i = 0; i<sizeof(Artillery);i++)
+	{
+	    if(Artillery[i][artid]!=-1)
+	    {
+	        if(IsPlayerInRangeOfPoint(playerid,6.0,Artillery[i][Art_PositonX],Artillery[i][Art_PositonY],Artillery[i][Art_PositonZ]))
+	        {
+	            count++;
+		        SetObjectFaceCoords3D(Artillery[i][artLocalID],Artillery[i][TargetPointX], Artillery[i][TargetPointY], Artillery[i][TargetPointZ],fRollOffset ,fPitchOffset ,fYawOffset);
+			}
+		}
+	}
+    if(count == 0) return SCM(playerid,COOLRED,"[Set Rotation] You're not near any Artillery!");
+    return 1;
+}
 
 
 
