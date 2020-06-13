@@ -2231,8 +2231,8 @@ stock ResetPlayerVariables(playerid)
 }
 stock MySQL_SetupConnection(ttl = 3)
 {
-	print("[MySQL] Verbindungsaufbau...");
-	//mysql_log();  //<- Kommentar vor mysql_log entfernen um den MySQL Debug-Modus zu aktivieren
+	print("[MySQL] Connecting...");
+	//mysql_log();
 
 	handle = mysql_connect(MYSQL_HOST, MYSQL_USER, MYSQL_PASS, MYSQL_DBSE);
 
@@ -2243,20 +2243,19 @@ stock MySQL_SetupConnection(ttl = 3)
 		if(ttl > 1)
 		{
 			//Versuche erneut eine Verbindung aufzubauen
-			print("[MySQL] Es konnte keine Verbindung zur Datenbank hergestellt werden.");
-			printf("[MySQL] Starte neuen Verbindungsversuch (TTL: %d).", ttl-1);
+			print("[MySQL] Connecting to MySQL Failed.");
+			printf("[MySQL] Retrying... (TTL: %d).", ttl-1);
 			return MySQL_SetupConnection(ttl-1);
 		}
 		else
 		{
 			//Abbrechen und Server schließen
-			print("[MySQL] Es konnte keine Verbindung zur Datenbank hergestellt werden.");
-			print("[MySQL] Bitte prüfen Sie die Verbindungsdaten.");
-			print("[MySQL] Der Server wird heruntergefahren.");
+			print("[MySQL] Couldn't establish a connection to database.");
+			print("[MySQL] Shutting down server....");
 			return SendRconCommand("exit");
 		}
 	}
-	printf("[MySQL] Die Verbindung zur Datenbank wurde erfolgreich hergestellt! Handle: %d", _:handle);
+	printf("[MySQL] Successfully connected! Handle: %d", _:handle);
 	return 1;
 }
 
