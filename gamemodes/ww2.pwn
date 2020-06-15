@@ -28,7 +28,14 @@ enum
     DIALOG_BAN,
     DIALOG_TUTORIAL,
     DIALOG_STATS,
-    DIALOG_CONFIG_ARTILLERY
+    DIALOG_CONFIG_ARTILLERY,
+    DIALOG_ADMIN_CONFIG,
+    DIALOG_ADMIN_CONFIG_GAMEMODE,
+    DIALOG_ADMIN_CONFIG_GAMEMODE_V, // vehicles
+    DIALOG_ADMIN_CONFIG_GAMEMODE_VH, // set vehicles health
+    DIALOG_ADMIN_CONFIG_SETWEATHER,
+    DIALOG_ADMIN_CONFIG_SETTIME,
+    DIALOG_ADMIN_CONFIG_SETMAXPLYRS // set maximum player amount on server
     
 }
 
@@ -40,8 +47,12 @@ enum
 new Text:TDEditor_TD[3];
 new startcounter;
 new gangzone;
+new timeshift = -1,shifthour;
 new updater;
 new miniumScore_pilot = 0;
+new changeTime,timeMinutes,timeHours;
+new WorldWeather,changeWeather,bool:weatherFreezed=false,timeFreezed=false,maximumPlayerPool;
+
 new Float:debug_speed = 40.0; // How fast are the bomb objects moving?
 
 new debug_howfar = 75; // how far from the Players Forward Position are the bombs being dropped in a bomber.
@@ -49,6 +60,10 @@ new debug_howfar = 75; // how far from the Players Forward Position are the bomb
 new Float:debug_rotationfloat = -2400.0;  // how far does the bomb rotate while being dropped?
 
 new MySQL:handle; // MySQL SA:MP GameMode connection!
+
+new txtstr[145]; // context(
+#define SendFormMessage(%0,%1,%2,%3) format(txtstr, 145, %2, %3) && SendClientMessage(%0, %1, txtstr)
+#define SendFormMessageToAll(%0,%1,%2) format(txtstr, 145, %1, %2) && SendClientMessageToAll(%0, txtstr)
 //
 
 // natives
@@ -127,6 +142,8 @@ new DroppingBombs[MAX_PLAYERS];
 
 //General defines
 #define SCM SendClientMessage
+#define MAX_SERVERCARS 300
+
 
 //
 
@@ -376,10 +393,12 @@ enum ArtillerySystem{
 	ammuNition,
 	bool: activeShooting,
 	bool: isEnabled,
-	dominatedByTeam
+	dominatedByTeam,
+	Text3D:artillerylabel
 }
 
 new Artillery[10][ArtillerySystem];
+
 
 
 
@@ -393,8 +412,30 @@ enum ProjetileSystem{
 
 new ProjectTile[325][ProjetileSystem];
 
+
+
+
+
+enum ServerVehicleData {
+	v_localid,
+	v_dbid,
+	v_valid,
+	v_color1,
+	v_color2,
+	v_function,
+	v_cartype,
+	Float:v_PosX,
+	Float:v_PosY,
+	Float:v_PosZ,
+	Float:v_PosR,
+	Text3D:v_3dtextlabel
+
+}
+new ServerCar[MAX_SERVERCARS][ServerVehicleData];
+
 public OnGameModeInit()
 {
+    maximumPlayerPool = 1000;
 //	SetGameModeText("Deathmatch");
 	updater = SetTimer("UpdateGameMode",1000,1);
 	SetTimer("CheckAirWinners",2500,1);
@@ -424,12 +465,21 @@ public OnGameModeInit()
 	   /* Artillery[i][TargetPointX] = -357.2592;
 	    Artillery[i][TargetPointY] = -1408.0635;
 	    Artillery[i][TargetPointZ] = 25.7266;*/
+	    
+	    Artillery[i][artillerylabel] = Text3D:-1;
 	}
 
 	
 	for(new i = 0; i<sizeof(ProjectTile);i++)
 	{
 	    ProjectTile[i][p_id]=-1;
+	}
+	
+	for(new i=0; i<sizeof(ServerCar); i++)
+	{
+	    ServerCar[i][v_dbid]=-1;
+	    ServerCar[i][v_3dtextlabel]=Text3D:INVALID_3DTEXT_ID;
+	    ServerCar[i][v_function]=0;
 	}
 // Soldier Class 
 	AddPlayerClass(12,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
@@ -474,6 +524,7 @@ public OnGameModeInit()
 	PrepareGameMode();
 	LoadGangZones();
  	LoadArtillerys();
+ 	LoadServerCars();
 
 	
 
@@ -563,6 +614,23 @@ public OnGameModeInit()
 
 	
 	
+	// BOATS LS Sea -Side (and maybe SF I wasn't that accurate) -- 15.06.2020
+	
+	AddStaticVehicle(472,249.0630,-1976.5541,0.2328,187.0685,32,32); // BOATLS_01
+	AddStaticVehicle(472,214.1445,-1995.2784,0.0627,94.9005,32,32); // BOATLS_02
+	AddStaticVehicle(472,444.9474,-2173.1885,0.3834,276.5180,32,32); // BOATLS_03
+	AddStaticVehicle(472,475.0387,-2194.8647,-0.2276,177.2545,32,32); // BOATLS_04
+	AddStaticVehicle(472,542.8326,-2340.1316,0.3471,271.8845,32,32); // BOATLS_05
+	AddStaticVehicle(472,572.1724,-2359.0825,0.1789,180.4990,32,32); // BOATLS_06
+	AddStaticVehicle(472,478.7000,-2461.2559,-0.2130,189.8300,32,32); // BOATLS_07
+	AddStaticVehicle(472,457.7924,-2488.5444,-0.2310,88.5603,32,32); // BOATLS_08
+	AddStaticVehicle(472,689.3386,-2653.4817,-0.2998,266.5908,32,32); // BOATLS_09
+	AddStaticVehicle(472,721.3934,-2674.5898,0.7024,178.0089,32,32); // BOATLS_010
+	AddStaticVehicle(472,863.8580,-2779.6006,-0.3692,266.0471,32,32); // BOATLS_011
+	AddStaticVehicle(472,898.4373,-2799.7310,-0.3689,178.4693,32,32); // BOATLS_012
+	AddStaticVehicle(472,892.0767,-2401.5300,0.2503,1.1343,32,32); // BOATLS_013
+	AddStaticVehicle(472,924.1375,-2381.9204,-0.1190,270.9054,32,32); // BOATLS_014
+	
 	
 	//
 	return 1;
@@ -581,14 +649,17 @@ public OnGameModeExit()
 
 public OnPlayerRequestClass(playerid, classid)
 {
+   
+
 	SetPlayerPos(playerid, -65.4287,-1359.8640,12.4613);
 	SetPlayerFacingAngle(playerid,69.6762);
-	
+
 	SetPlayerCameraPos(playerid,-68.5222,-1357.7305,12.5180);
 	SetPlayerCameraLookAt(playerid, -65.4287,-1359.8640,12.4613);
-	
-	
+
+
 	PlayerInfo[playerid][pClassSelection]=true;
+
 	return 1;
 }
 
@@ -596,7 +667,18 @@ public OnPlayerRequestClass(playerid, classid)
 
 public OnPlayerConnect(playerid)
 {
+
+
+    
     ResetPlayerVariables(playerid);
+    
+    
+    if(GetPlayerPoolSize()+1 > maximumPlayerPool)  // can be abused, need trusted admins. Or something else hahaha. ok.
+    {
+        SCM(playerid,COOLRED,"[SERVER-KICK] You've been kicked, because the maximum Player Amount has been reached.");
+        KickEx(playerid);
+        return 1;
+	}
     
     CheckUserBan(playerid);
     
@@ -708,12 +790,24 @@ public OnPlayerDisconnect(playerid, reason)
 
 public OnPlayerSpawn(playerid)
 {
+	StopAudioStreamForPlayer(playerid);
     if(Server[ModeStarted]==false)
     {
         SetPlayerPos(playerid,-704.9656,1952.4576,5.1078);
 	    SetPlayerFacingAngle(playerid,223.1054);
 	    SCM(playerid,COLOR_GREEN,"Welcome to LUFTSCHLACHT! The Game is being prepared...");
 	    return 1;
+	}
+	if(PlayerInfo[playerid][IsConfiguringArtillery])
+	{
+	    SCM(playerid,-1,"Jo");
+	    new arte_id = GetPVarInt(playerid,"ArtilleryID");
+ 		PlayerInfo[playerid][IsConfiguringArtillery] = false;
+   		HideBox(playerid);
+     	SetPlayerPos(playerid,Artillery[arte_id][Art_PositonX]-1,Artillery[arte_id][Art_PositonY],Artillery[arte_id][Art_PositonZ]);
+     	//SetPlayerSkin(playerid,PlayerInfo[playerid][pSkin]);
+     	DeletePVar(playerid,"ArtilleryID");
+     	return 1;
 	}
  	if(PlayerInfo[playerid][pTutorial]==1)
  	{
@@ -741,10 +835,7 @@ public OnPlayerSpawn(playerid)
 	if(PlayerInfo[playerid][pClassSelection] == false)
 	{
 
-	/*    if(Server[ModeStarted]==true)
-		{
-		    PlayerInfo[playerid][AlreadySpawned]=true;
-		}*/
+
 	    if(GetPlayerTeam(playerid) == 255 && Server[ModeStarted]==true)
 	    {
 	        if(GetTeamPlayers(1) > GetTeamPlayers(2))
@@ -767,7 +858,7 @@ public OnPlayerSpawn(playerid)
 			{
 				SetTimerEx("SpawnKillEnd", 8000, 0,"i",playerid);
 			}
-			SetPlayerWorldBounds(playerid, 1027.9858, -488.1284, -728.1127, -2107.9824);
+		//	SetPlayerWorldBounds(playerid, 1027.9858, -488.1284, -728.1127, -2107.9824);
 			
 			new Random;
 			switch(GetPlayerTeam(playerid))
@@ -1261,25 +1352,25 @@ stock PrepareGameMode()
 
 	VehicleInfo[1][LocalID] = AddStaticVehicle(476,286.8562,-1862.9209,3.5516,91.1361,6,6);  // Ls Flugzeuge
 
-	VehicleInfo[2][LocalID] = AddStaticVehicle(476,286.9519,-1850.8475,3.9125,89.8315,6,6);
+	VehicleInfo[2][LocalID] = AddStaticVehicle(476,913.6702,-2290.7747,3.2569,99.7710,6,6);
 
-	VehicleInfo[3][LocalID] = AddStaticVehicle(476,287.1361,-1839.1473,4.2506,89.3586,6,6);
+	VehicleInfo[3][LocalID] = AddStaticVehicle(476,287.1361,-1839.1473,4.2506,99.5530,6,6);
 
 	VehicleInfo[4][LocalID] = AddStaticVehicle(476,287.3204,-1827.7021,4.5636,90.4841,6,6);
 
-	VehicleInfo[5][LocalID] = AddStaticVehicle(476,287.3728,-1816.0518,4.8671,89.5865,6,6);
+	VehicleInfo[5][LocalID] = AddStaticVehicle(476,887.4409,-2607.3037,3.7567,70.7332,6,6);
 
 	VehicleInfo[6][LocalID] = AddStaticVehicle(476,286.9475,-1804.6365,5.0574,91.0835,6,6);
 
-	VehicleInfo[7][LocalID] = AddStaticVehicle(476,286.5289,-1792.8777,5.0208,91.3815,6,6);
+	VehicleInfo[7][LocalID] = AddStaticVehicle(476,891.6022,-2595.0205,3.7603,72.6776,6,6);
 
 	VehicleInfo[8][LocalID] = AddStaticVehicle(476,306.5972,-1856.7286,3.8510,90.2504,6,6);
 
-	VehicleInfo[9][LocalID] = AddStaticVehicle(476,306.6064,-1845.3405,4.1526,90.2081,6,6);
+	VehicleInfo[9][LocalID] = AddStaticVehicle(476,785.0471,-2881.6101,4.2563,60.0900,6,6);
 
 	VehicleInfo[10][LocalID] = AddStaticVehicle(476,306.6231,-1833.8168,4.4865,90.3218,6,6);
 
-	VehicleInfo[11][LocalID] = AddStaticVehicle(476,302.5186,-1822.0491,4.7776,91.5145,6,6);
+	VehicleInfo[11][LocalID] = AddStaticVehicle(476,793.7888,-2866.3440,4.2571,62.4174,6,6);
 
 	VehicleInfo[12][LocalID] = AddStaticVehicle(476,302.4044,-1810.0698,5.0715,90.3324,6,6);
 	
@@ -1301,30 +1392,30 @@ stock PrepareGameMode()
 
 	VehicleInfo[13][LocalID] = AddStaticVehicleEx(476,-327.0711,-1424.0215,14.8314,271.4219,8,8,12);  // SF Flugzeuge
 
-	VehicleInfo[14][LocalID] = AddStaticVehicle(476,-326.8553,-1410.8499,14.7713,266.5722,7,7);
+	VehicleInfo[14][LocalID] = AddStaticVehicle(476,-27.7122,-2918.0132,3.6500,274.4140,7,7);
 
 	VehicleInfo[15][LocalID] = AddStaticVehicle(476,-326.2861,-1398.3126,13.9737,267.8988,7,7);
 
-	VehicleInfo[16][LocalID] = AddStaticVehicle(476,-325.2201,-1386.6586,12.9594,266.8053,7,7);
+	VehicleInfo[16][LocalID] = AddStaticVehicle(476,-26.0296,-2935.7324,3.6512,276.7218,7,7);
 
 
 	VehicleInfo[17][LocalID] = AddStaticVehicle(476,-407.5030,-1391.6349,24.1916,281.9602,7,7);
 
-	VehicleInfo[18][LocalID] = AddStaticVehicle(476,-416.5064,-1375.1812,24.2779,282.8986,7,7);
+	VehicleInfo[18][LocalID] = AddStaticVehicle(476,73.3950,-2669.3918,3.6511,290.3344,7,7);
 
 	VehicleInfo[19][LocalID] = AddStaticVehicle(476,-416.2974,-1358.1239,24.6949,280.7294,7,7);
 
-	VehicleInfo[20][LocalID] = AddStaticVehicle(476,-418.6104,-1342.5516,25.9786,280.9048,7,7);
+	VehicleInfo[20][LocalID] = AddStaticVehicle(476,79.4010,-2685.9917,3.6596,290.7787,7,7);
 
 	VehicleInfo[21][LocalID] = AddStaticVehicle(476,-417.3068,-1328.1924,27.5177,279.2845,7,7);
 
-	VehicleInfo[22][LocalID] = AddStaticVehicle(476,-418.3099,-1314.1429,29.7785,272.0164,7,7);
+	VehicleInfo[22][LocalID] = AddStaticVehicle(476,63.6249,-2492.6235,3.7583,330.3273,7,7);
 
 //	SFflugzeuge[11] = AddStaticVehicle(476,-417.9878,-1297.4380,31.8950,263.3316,7,7);
 
     VehicleInfo[23][LocalID] = AddStaticVehicle(476,-417.3089,-1293.1337,32.5913,271.4613,7,7);
 
-	VehicleInfo[24][LocalID] = AddStaticVehicle(476,-418.2881,-1280.0403,35.3042,275.0225,7,7);
+	VehicleInfo[24][LocalID] = AddStaticVehicle(476,48.4173,-2483.2893,3.7690,324.6481,7,7);
     
     VehicleInfo[13][teamidd]= 2;
 	VehicleInfo[14][teamidd]= 2;
@@ -1809,9 +1900,7 @@ public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 		    if(arte_id == -1)
 		    {
 		        SetPlayerCamera(playerid, 0);
-		        PlayerInfo[playerid][IsConfiguringArtillery] = false;
-		        HideBox(playerid);
-		        SetPlayerPos(playerid,Artillery[arte_id][Art_PositonX]-1,Artillery[arte_id][Art_PositonY],Artillery[arte_id][Art_PositonZ]);
+		        
 			}
 			else
 			{
@@ -1823,7 +1912,7 @@ public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 	        	Artillery[arte_id][TargetPointZ] = PlayerInfo[playerid][pTargetArtPos_Z];
 	        	HideBox(playerid);
 	        	SetPlayerCamera(playerid, 0);
-		        PlayerInfo[playerid][IsConfiguringArtillery] = false;
+		      //  PlayerInfo[playerid][IsConfiguringArtillery] = false;
 		        SetPlayerPos(playerid,Artillery[arte_id][Art_PositonX]-1,Artillery[arte_id][Art_PositonY],Artillery[arte_id][Art_PositonZ]);
 			}
 		}
@@ -1994,10 +2083,337 @@ public OnVehicleStreamOut(vehicleid, forplayerid)
 	return 1;
 }
 
+
+stock ExplodeVehicle(vehicleid)
+{
+	new Float:vehicleX,Float:vehicleY,Float:vehicleZ;
+	GetVehiclePos(vehicleid,vehicleX,vehicleY,vehicleZ);
+	CreateExplosion(vehicleX,vehicleY,vehicleZ,0,20.0);
+	return 1;
+}
+IsNumeric(const string[])
+{
+    for (new i = 0, j = strlen(string); i < j; i++)
+    {
+        if (string[i] > '9' || string[i] < '0') return 0;
+    }
+    return 1;
+}
+
+stock SendAdminReport(report[],lvl)
+{
+   // B18904 gold color
+   
+	for(new i = GetPlayerPoolSize(); i != -1; --i)
+	{
+	    if(IsPlayerAdminEx(i,lvl))
+	    {
+	        SCM(i,COLOR_GOLD,report);
+		}
+	}
+}
+
+forward OnKicked(playerid);
+public OnKicked(playerid)
+{
+	Kick(playerid);
+}
+stock KickEx(playerid)
+{
+	SetTimerEx("OnKicked", 20, false, "i", playerid);
+	return 1;
+}
+stock GetWeatherName(weatherid) // very accurat
+{
+	new weatherName[25];
+	switch(weatherid)
+	{
+	    case 0:
+	    {
+	        weatherName = "EXTRASUNNY_LA";
+		}
+		case 1:
+	    {
+            weatherName = "SUNNY_LA";
+		}
+		case 2:
+	    {
+            weatherName = "EXTRASUNNY_SMOG_LA";
+		}
+		case 3:
+	    {
+            weatherName = "SUNNY_SMOG_LA";
+		}
+		case 4:
+	    {
+            weatherName = "CLOUDY_LA";
+		}
+		case 5:
+	    {
+            weatherName = "SUNNY_SF";
+		}
+		case 6:
+	    {
+            weatherName = "EXTRASUNNY_SF";
+		}
+		case 7:
+	    {
+            weatherName = "CLOUDY_SF";
+		}
+		case 8:
+	    {
+            weatherName = "RAINY_SF";
+		}
+		case 9:
+	    {
+            weatherName = "FOGGY_SF";
+		}
+		case 10:
+	    {
+            weatherName = "SUNNY_VEGAS";
+		}
+		case 11:
+	    {
+            weatherName = "EXTRASUNNY_VEGAS";
+		}
+		case 12:
+	    {
+            weatherName = "CLOUDY_VEGAS";
+		}
+		case 13:
+	    {
+            weatherName = "EXTRASUNNY_COUNTRYSIDE";
+		}
+		case 14:
+	    {
+            weatherName = "SUNNY_COUNTRYSIDE";
+		}
+		case 15:
+	    {
+            weatherName = "CLOUDY_COUNTRYSIDE"; // üover all?
+		}
+		case 16:
+	    {
+            weatherName = "RAINY_COUNTRYSIDE";
+		}
+		case 17:
+	    {
+            weatherName = "EXTRASUNNY_DESERT";
+		}
+		case 18:
+	    {
+            weatherName = "SUNNY_DESERT";
+		}
+		case 19:
+	    {
+            weatherName = "SANDSTORM_DESERT";
+		}
+		case 20:
+	    {
+			weatherName = "UNDERWATER";
+		}
+	}
+	return weatherName;
+}
 public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 {
 	switch(dialogid)
 	{
+	    case DIALOG_ADMIN_CONFIG:
+	    {
+	        if(!response) return 0;
+	        
+	        switch(listitem)
+	        {
+	            case 0: //game mode settings
+	            {
+	                new sstring[156];
+	                strcat(sstring,"{FFFFFF}Set Server time\nSet Server Weather\nFreeze Weather\nFreeze Time\nSet Maximum Player Count\nArtillery Configuration(MENU)\nVehicle Configuration(MENU)");
+                    ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_GAMEMODE,DIALOG_STYLE_LIST,"Game-Mode Settings",sstring,"{58D3F7}Continue","Exit");
+				}
+	        }
+		}
+		case DIALOG_ADMIN_CONFIG_GAMEMODE:
+		{
+		    switch(listitem)
+		    {
+		        case 0: // set Servertime
+		        {
+		            ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETTIME,DIALOG_STYLE_LIST,"Set Time","{FFFFFF}Please Insert a {B45F04}Weather {FFFFFF}ID:\n(Can be found be Google.\nIDs are between 0-23","{58D3F7}Set","Exit");
+				}
+				case 1: // set Weather
+		        {
+                    ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETWEATHER,DIALOG_STYLE_INPUT,"Set Weather","{FFFFFF}Please Insert a {B45F04}Time {FFFFFF}ID:\n(Can be found be Google.\nIDs are between 0-23","{58D3F7}Set","Exit");
+				}
+				case 2: // freeze Weather
+		        {
+		            new string[128];
+					if(weatherFreezed)
+					{
+					    SCM(playerid,COLOR_WHITE,"[SET WEATHER] Weather {3ADF00}unfreezed");
+					    weatherFreezed = false;
+						format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has unfreezed the weather",GetName(playerid),playerid);
+						SendAdminReport(string,1);
+					}
+					else
+					{
+					    SCM(playerid,COLOR_WHITE,"[SET WEATHER] Weather {FF0000}freezed");
+					    weatherFreezed = true;
+						format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has freezed the weather",GetName(playerid),playerid);
+						SendAdminReport(string,1);
+					}
+				}
+				case 3: // freeze time timeFreezed
+		        {
+
+		            new string[128];
+					if(timeFreezed)
+					{
+					    SCM(playerid,COLOR_WHITE,"[SET WORLD TIME] World Time {3ADF00}unfreezed");
+					    timeFreezed = false;
+						format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has unfreezed the world time",GetName(playerid),playerid);
+						SendAdminReport(string,1);
+					}
+					else
+					{
+					    SCM(playerid,COLOR_WHITE,"[SET WORLD TIME] World Time {FF0000}freezed");
+					    timeFreezed = true;
+						format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has freezed the world time",GetName(playerid),playerid);
+						SendAdminReport(string,1);
+					}
+				}
+				case 4: // set Maximum Player COunt -- poolSize
+		        {
+		            if(!IsPlayerAdminEx(playerid,3))return SCM(playerid,COLOR_RED,"You are not permitted.");
+		            if(GetPlayerPoolSize() < maximumPlayerPool) return SCM(playerid,COOLRED,"[SET MAXIMUM PLAYERS] The maximum amount can't be lower than the actual player count.");
+		            
+		            
+		            
+		            ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETMAXPLYRS,DIALOG_STYLE_INPUT,"Set Maximum Players","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} between 0-1000","{58D3F7}Set","Exit");
+					
+				}
+				case 5: // vehicle configruation
+		        {
+		            new sstring[156];
+	                strcat(sstring,"{FFFFFF}Respawn All Vehioces\nDestroy All Vehicles\nExplode all Vehicles\nSet all Vehicles to value Health...\nReplace all Planes with ID...\nReplace all Tanks with ID...");
+                    ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_GAMEMODE_V,DIALOG_STYLE_LIST,"Vehicle configuration",sstring,"{58D3F7}Continue","Exit");
+                    // you've been kicked as admin DIALOG setplayeramdinlevel or so HIDE Dialog when somebody gets demoted as admin!
+				}
+			}
+		}
+		
+		case DIALOG_ADMIN_CONFIG_SETMAXPLYRS:
+		{
+		    if(!IsPlayerAdminEx(playerid,3))return SCM(playerid,COLOR_RED,"You are not permitted.");
+		    if(!strval(inputtext) || strval(inputtext) < 0 || strval(inputtext)>1000) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETMAXPLYRS,DIALOG_STYLE_INPUT,"Set Maximum Players\n LIMIT: 0-1000","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} between 0-1000","{58D3F7}Set","Exit");
+		    if(!IsNumeric(inputtext)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETMAXPLYRS,DIALOG_STYLE_INPUT,"Set Maximum Players\n LIMIT: 0-1000","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} between 0-1000","{58D3F7}Set","Exit");
+		    if(GetPlayerPoolSize() < maximumPlayerPool)
+			{
+				SCM(playerid,COOLRED,"[SET MAXIMUM PLAYERS] The maximum amount can't be lower than the actual player count.");
+				ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETMAXPLYRS,DIALOG_STYLE_INPUT,"Set Maximum Players","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} between 0-1000","{58D3F7}Set","Exit");
+			}
+			else
+			{
+			    maximumPlayerPool = strval(inputtext);
+			}
+		    
+		    
+		}
+		case DIALOG_ADMIN_CONFIG_SETWEATHER:
+		{
+		    if(!strval(inputtext) || strval(inputtext) < 0 || strval(inputtext)>20) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETWEATHER,DIALOG_STYLE_INPUT,"Set Weather {FF0000}Only Numbers (0-20)","{FFFFFF}Please Insert a {B45F04}Weather {FFFFFF}ID:\n(Can be found be Google.\nIDs are between 0-20","{58D3F7}Set","Exit");
+		    if(!IsNumeric(inputtext)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETWEATHER,DIALOG_STYLE_INPUT,"Set Weather {FF0000}Only Numbers (0-20)","{FFFFFF}Please Insert a {B45F04}Weather {FFFFFF}ID:\n(Can be found be Google.\nIDs are between 0-20","{58D3F7}Set","Exit");
+		    SetWeather(strval(inputtext));  // strval inputtext would be numeric. OFC
+			new string[128];
+			format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted the Weather to ID %d (%s)",GetName(playerid),playerid,strval(inputtext),GetWeatherName(strval(inputtext)));
+			SendAdminReport(string,1);
+			
+			
+			new sstring[156];
+   			strcat(sstring,"{FFFFFF}Set Server time\nSet Server Weather\nSet Maximum Player Count\nArtillery Configuration(MENU)\nVehicle Configuration(MENU)");
+      		ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_GAMEMODE,DIALOG_STYLE_INPUT,"Game-Mode Settings",sstring,"{58D3F7}Continue","Exit");
+			
+		    
+		}
+		case DIALOG_ADMIN_CONFIG_SETTIME:
+		{
+		    if(!strval(inputtext) || strval(inputtext) < 0 || strval(inputtext)>23) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETWEATHER,DIALOG_STYLE_INPUT,"Set Time {FF0000}Only Numbers (0-23)","{FFFFFF}Please Insert a {B45F04}Time {FFFFFF}\n(Can be found be Google.\nIDs are between 0-23","{58D3F7}Set","Exit");
+		    if(!IsNumeric(inputtext)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETWEATHER,DIALOG_STYLE_INPUT,"Set Time {FF0000}Only Numbers (0-23)","{FFFFFF}Please Insert a {B45F04}Time {FFFFFF}\n(Can be found be Google.\nIDs are between 0-23","{58D3F7}Set","Exit"); //valid weatherid required
+		    timeHours = strval(inputtext); // strval inputtext would be numeric. OFC
+			new string[128];
+			format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted the World Time to %d",GetName(playerid),playerid,strval(inputtext));
+			SendAdminReport(string,1);
+			new sstring[156];
+   			strcat(sstring,"{FFFFFF}Set Server time\nSet Server Weather\nSet Maximum Player Count\nArtillery Configuration(MENU)\nVehicle Configuration(MENU)");
+      		ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_GAMEMODE,DIALOG_STYLE_INPUT,"Game-Mode Settings",sstring,"{58D3F7}Continue","Exit");
+
+
+		}
+		case DIALOG_ADMIN_CONFIG_GAMEMODE_V:
+		{
+		    switch(listitem)
+		    {
+		        case 0: // Respawn All Vehicles
+		        {
+                    for(new i = GetVehiclePoolSize(); i > 0; i--) // kicks players out of car
+					{
+					    if(i == INVALID_VEHICLE_ID) continue;
+						SetVehicleToRespawn(i); // SetVehicleToRespawn(i); works the same lol but is not correct? it is nvm.
+					}
+				}
+				case 1: // Destroy All Vehicles
+		        {
+                    for(new i = GetVehiclePoolSize(); i > 0; i--) // kicks players out of car
+					{
+					    if(i == INVALID_VEHICLE_ID) continue;
+						DestroyVehicle(i);
+					}
+				}
+				case 2: // Explode all Vehicles
+		        {
+                    for(new i = GetVehiclePoolSize(); i > 0; i--) // kicks players out of car
+					{
+					    if(i == INVALID_VEHICLE_ID) continue;
+						ExplodeVehicle(i);
+					}
+				}
+				case 3: // Set all Vehicles to Health X
+		        {
+                    ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_GAMEMODE_VH,DIALOG_STYLE_MSGBOX,"Set Vehicles Health","Set all Vehicles to Health? Enter a Float Number (e.g 12.0)","{58D3F7}Set","Exit");
+				}
+			}
+		}
+		
+		case DIALOG_ADMIN_CONFIG_GAMEMODE_VH:
+		{
+		    if(!response) return 0;
+		    if(!strval(inputtext)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_GAMEMODE_VH,DIALOG_STYLE_MSGBOX,"Set Vehicles Health","Set all Vehicles to Health? Enter a Float Number (e.g 12.0)","{58D3F7}Set","Exit");
+		   /* new tag = tagof (inputtext);
+
+			if(tag != tagof (Float:)) 
+			{
+			    ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_GAMEMODE_VH,DIALOG_STYLE_MSGBOX,"Set Vehicles Health\nUSE A FLOAT!","Set all Vehicles to Health? Enter a Float Number (e.g 12.0)","{58D3F7}Set","Exit");
+			}
+			
+			for(new i = GetVehiclePoolSize(); i > 0; i--) // kicks players out of car
+			{
+			    new Float:health;
+			    health = inputtext;
+   				if(i == INVALID_VEHICLE_ID) continue;
+				SetVehicleHealth(i,health);
+			}*/
+			
+			
+			if(!IsNumeric(inputtext)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_GAMEMODE_VH,DIALOG_STYLE_MSGBOX,"Set Vehicles Health (ONLY NUMBERS)","Set all Vehicles to Health? Enter a Float Number (e.g 12.0)","{58D3F7}Set","Exit");
+			new floatr = strval(inputtext);
+			float(floatr);
+			for(new i = GetVehiclePoolSize(); i > 0; i--) // kicks players out of car
+			{
+   				if(i == INVALID_VEHICLE_ID) continue;
+				SetVehicleHealth(i,floatr);
+			}
+		    
+		}
 	    case DIALOG_CONFIG_ARTILLERY:
 	    {
 	        if(!response) return 0;
@@ -2128,6 +2544,7 @@ public OnUserRegister(playerid)
 	SendClientMessage(playerid, 0x00FF00FF, "[Account] Registration successful.");
 	PlayerInfo[playerid][pTutorial]  = 1;
 	PlayerInfo[playerid][pTutStep]=1;
+	//SpawnPlayer(playerid);
 	return 1;
 }
 
@@ -2159,6 +2576,7 @@ public OnUserLogin(playerid)
 		SendClientMessage(playerid, 0x00FF00FF, "[Account] You logged in.");
 		ResetPlayerMoney(playerid);
 		GivePlayerMoney(playerid, PlayerInfo[playerid][pMoney]);
+		//SpawnPlayer(playerid);
 	}
 	return 1;
 }
@@ -2172,11 +2590,23 @@ public OnUserCheck(playerid)
 	{
 		//Der Spieler konnte nicht gefunden werden, er muss sich registrieren
 		ShowPlayerDialog(playerid, DIALOG_REGISTER, DIALOG_STYLE_PASSWORD, "Registration", "Pleae register:", "Register", "Cancel");
+		PlayAudioStreamForPlayer(playerid,"http://xtreme-reallife.s4y-web.de/music/introtheme.mp3"); //Song: BB - Stay out of my Territory
+	/*	TogglePlayerSpectating(playerid, 1);   not working correclty, maybe later
+		InterpolateCameraPos(playerid, 956.322082, -2363.198242, 151.125747, -195.668319, -1584.957763, 37.390377, 40000);
+		InterpolateCameraLookAt(playerid, 952.192810, -2360.408447, 150.718063, -199.797622, -1582.167968, 36.982688, 40000);
+		PlayAudioStreamForPlayer(playerid,"http://xtreme-reallife.s4y-web.de/music/introtheme.mp3"); Song: BB - Stay out of my Territory
+		Streamer_Update(playerid);*/
+		
+
 	}
 	else
 	{
 		//Es existiert ein Ergebnis, das heißt der Spieler ist registriert und muss sich einloggen
 		ShowPlayerDialog(playerid, DIALOG_LOGIN, DIALOG_STYLE_PASSWORD, "Login", "Please login:", "Login", "Cancel");
+		PlayAudioStreamForPlayer(playerid,"http://xtreme-reallife.s4y-web.de/music/introtheme.mp3"); //Song: BB - Stay out of my Territory
+		
+		
+
 	}
 	return 1;
 }
@@ -2261,7 +2691,7 @@ stock MySQL_SetupConnection(ttl = 3)
 
 
 
-stock IsPlayerAdminEx(playerid,admlvl)
+stock IsPlayerAdminEx(playerid,admlvl) // rename to GetPlayerAdmin maybe
 {
 	if(PlayerInfo[playerid][pAdmin]>=admlvl) return 1;
 	return 0;
@@ -2868,6 +3298,9 @@ public LoopThrewAllPlayers()
 forward UpdateGameMode();
 public UpdateGameMode()
 {
+    changeTime++;
+    changeWeather++;
+    
     new string[128];
 	if(Server[Prepared]==false)
 	{
@@ -2898,7 +3331,11 @@ public UpdateGameMode()
 	
 	for(new i = 0; i<sizeof(Artillery);i++)
 	{
-	    FireArtillery(i);
+	    if(Artillery[i][artid]!=-1)
+	 	{
+	    	FireArtillery(i);
+	    	updateArtillery(i);
+		}
 	}
 	
 	for(new id=0; id<MAX_ZONES; id++)
@@ -2938,225 +3375,82 @@ public UpdateGameMode()
 			GangZoneShowForAll(GangZones[id][LocalZone],GetTeamColor(GangZones[id][DominatedBy]));
 		}
 	}
-	/*
-	if(Server[LandGefecht]==true && Server[Prepared]==true) // true
+	
+	for(new i = GetPlayerPoolSize(); i != -1; --i)
 	{
-	    if(Server[PreparePhase2]==false)
+	    if(IsPlayerConnected(i) && !timeFreezed)
 	    {
-	        Server[Sekunden]--;
-	      //  Server[Minuten]--;
-	        //if(Server[Sekunden]<=0 && Server[Minuten]!=0){Server[Sekunden]=59;}
-	        if(Server[Sekunden] == 0 && Server[Minuten] == 0)
-	        {
-	            new stepwinner = Server[EtappenWinner];
-	            Server[PreparePhase2]=false;
-	            if(City[stepwinner][Captured]>2)
-	            {
-	                format(string,sizeof(string),"[END] The Attackers %s captured $d/4 Checkpoints and Won the Round!",GetTeamName(stepwinner),City[stepwinner][Captured]);
-	                SendClientMessageToAll(COLOR_GREEN,string);
-	                SetTimer("Restart",9000,0);
-	                // bis 3/4 keine Sorge man hat etwas wie punktezänlung und teamriviltItät am ende
-	            }
-	            else
-	            {
-	                if(City[stepwinner][Defended] == 0) {City[stepwinner][Defended]=4;}
-	                format(string,sizeof(string),"Team %s defended their Territory by holding %d/4 Checkpoints!",GetTeamName(GetEnemy(stepwinner)),City[stepwinner][Defended]);
-	                SendClientMessageToAll(COLOR_GREEN,string);
-	                SendClientMessageToAll(COLOR_GREEN,"The Match is starting into a new Round!");
-	                KillTimer(updater);
-	                Server[Prepared]=false;
-	                SetTimer("NewRound",9000,0);
-	                // bis 3/4 keine Sorge man hat etwas wie punktezänlung und teamriviltItät am ende
-	            }
-	            // Ende
-	            return 1;
-	        }
-	        if(Server[Sekunden]<=0)
-	        {
-	            Server[Minuten]--;
-	            Server[Sekunden]=59;
-	        }
-	        format(string, sizeof(string), "%02d:%02d", Server[Minuten],Server[Sekunden]);
-	        TextDrawSetString(TDEditor_TD[2], string);
-	    }
-		
-		for(new cpidd=0; cpidd<MAX_CAPTURE_POINTS;cpidd++)
-		{
-		    if(Capture[cpidd][ActiveCapture]==1)
-		    {
-		        Capture[cpidd][ProgressTime]++;
-				if(Capture[cpidd][ProgressTime] > MAX_CAPTURE_TIME)
-				{
-				    if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) > GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))
-				    {
-				        // Gebiet erobert
-						format(string,sizeof(string),"[CAPTURE] Team %s captured a new Zone!",GetTeamName(Capture[cpidd][tattacker]));
-						SendClientMessageToAll(COLOR_GREEN,string);
-						Capture[cpidd][owner]=Capture[cpidd][tattacker];
-						
-						City[Capture[cpidd][tattacker]][Captured]++;
-					}
-			        if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) < GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))
-				    {
-				        // Gebiet verteidigt
-						format(string,sizeof(string),"[CAPTURE] Team %s successfully defended their Zone!",GetTeamName(Capture[cpidd][tdefender]));
-						SendClientMessageToAll(COLOR_GREEN,string);
-						City[Capture[cpidd][tdefender]][Defended]++;
-					}
-					if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) == GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))  // if wert == 1 return 1; Kampf um 10 sek verlängern?
-				    {
-				        // Gebiet gleichstand
-						format(string,sizeof(string),"[CAPTURE] Team %s successfully defended their Zone!",GetTeamName(Capture[cpidd][tdefender]));
-						SendClientMessageToAll(COLOR_GREEN,string);
-                        City[Capture[cpidd][tdefender]][Defended]++;
-					}
-
-					if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) ==0 && GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender] ==0))
-				    {
-				        // Gebiet nobody there
-						format(string,sizeof(string),"[CAPTURE] Team %s stopped capturing a Zone!",GetTeamName(Capture[cpidd][tattacker]));
-						SendClientMessageToAll(COLOR_GREEN,string);
-					}
-					for(new i = GetPlayerPoolSize(); i != -1; --i)
-					{
-					    if(IsPlayerConnected(i))
-						{
-						    if(PlayerInfo[i][pInCP]==cpidd)
-						    {
-						        KillTimer(PlayerInfo[i][pProgressTimer]);
-						        HidePlayerProgressBar(i, PlayerInfo[i][pProgress]);
-								//DestroyPlayerProgressBar(i,PlayerInfo[i][pProgress]);
-							}
-						}
-					}
-                    Capture[cpidd][tattacker]=0;
-                    Capture[cpidd][tdefender]=0;
-				 	Capture[cpidd][ActiveCapture]=0;
-				 	Capture[cpidd][kampfvorbei]=true;
-				 	Capture[cpidd][ProgressTime]=0;
-
-				}
-				else
-				{
-	    			for(new i = GetPlayerPoolSize(); i != -1; --i)
-					{
-	    				if(IsPlayerConnected(i))
-						{
-		    				if(PlayerInfo[i][pInCP]==Capture[cpidd][baseid])
-					    	{
-					    	    SetPlayerProgressBarMaxValue(i,PlayerInfo[i][pProgress],MAX_CAPTURE_TIME);
-		        				SetPlayerProgressBarValue(i,PlayerInfo[i][pProgress],Capture[cpidd][ProgressTime]);
-								UpdatePlayerProgressBar(i,PlayerInfo[i][pProgress]);
-								ShowPlayerProgressBar(i,PlayerInfo[i][pProgress]);
-							}
-						}
-					}
-				}
-			}
+	        SetPlayerTime(i,timeHours,timeMinutes);
+	        SetPlayerWeather(i,WorldWeather);
 		}
-		for(new i = GetPlayerPoolSize(); i != -1; --i)
+	}
+	
+	if(changeTime > 59)
+	{
+		new year, month,day;
+		getdate(year, month, day);
+ 		new hour,minute,second;
+		gettime(hour,minute,second);
+		FixHour(hour);
+		hour = shifthour;
+		
+		timeHours = hour;
+		timeMinutes = minute;
+		
+		if(changeWeather > 7200) // 2hours
 		{
-  			if(IsPlayerConnected(i))
+		
+		    new newWeather = GetRandomNormaLWeatherID();
+		    
+		    if(weatherFreezed)
+		    {
+				SendAdminReport("[ADMIN-REPORT] Tried to set random weather, but Weather is still freezed. Use /config to unfreeze Weather.",1);
+			}
+			else
 			{
-				new team = GetPlayerTeam(i);
-				new enemy = GetEnemy(team);
-				if(team != 255)
-				{
-				    if(team == Server[EtappenWinner])
-				    {
-                   // 	format(string, sizeof(string), "{01DF01}%d{FFFFFF}/{FFFF00}4{FFFFFF} Captured", City[team][Captured]);
-                        format(string, sizeof(string), "%d/4", City[team][Captured]);
-						PlayerTextDrawSetString(i,TeamCapturePoints[i], string);
-						PlayerTextDrawColor(i, TeamCapturePoints[i], COLOR_GREEN);
-					}
-					else if(team != Server[EtappenWinner])
-					{
-					   // format(string, sizeof(string), "{FF0000}%d{FFFFFF}/{FFFF00}4{FF0000} lost", City[enemy][Captured]);
-					    format(string, sizeof(string), "%d/4", City[enemy][Captured]);
-						PlayerTextDrawSetString(i,TeamCapturePoints[i], string);
-						PlayerTextDrawColor(i, TeamCapturePoints[i], COLOR_RED);
-					}
-					if(PlayerInfo[i][pDead]==false)
-					{
-						PlayerTextDrawShow(i,TeamCapturePoints[i]);
-						TextDrawShowForPlayer(i,TDEditor_TD[2]);
-					}
-				}
+                WorldWeather = newWeather;
 			}
 		}
 	}
-	else
-	{
-	    for(new i = GetPlayerPoolSize(); i != -1; --i)
-	    {
-	        if(IsPlayerConnected(i))
-	        {
-	            if(GetPlayerTeam(i) !=255)
-	            {
-	             //   TextDrawShowForPlayer(i,TDEditor_TD[0]);
-	                new team = GetPlayerTeam(i);
-	                new enemy = GetEnemy(team);
-	                if(team == 1 || team == 2)
-	                if(City[team][LuftFlugzeuge]==City[enemy][LuftFlugzeuge] || City[team][LuftFlugzeuge]>City[enemy][LuftFlugzeuge] && PlayerInfo[i][pDead]==false)
-	                {
-	                    format(string, sizeof(string), "%02d", City[enemy][LuftFlugzeuge]); // %02d
-    					PlayerTextDrawSetString(i,TDEditor_PTD[i], string);
-	                    PlayerTextDrawColor(i, TDEditor_PTD[i], COLOR_RED);
-	                    if(PlayerInfo[i][pDead]==false)
-						{
-	                    	PlayerTextDrawShow(i,TDEditor_PTD[i]);
-						}
-
-					}
-					if(City[enemy][LuftFlugzeuge] > City[team][LuftFlugzeuge])
-					{
-					    format(string, sizeof(string), "%02d", City[team][LuftFlugzeuge]);
-    					PlayerTextDrawSetString(i,TDEditor_PTD[i], string);
-					    PlayerTextDrawColor(i, TDEditor_PTD[i], COLOR_BLUE);
-					    if(PlayerInfo[i][pDead]==false)
-						{
-					    	PlayerTextDrawShow(i,TDEditor_PTD[i]);
-					    	
-					    }
-					}
-					if(City[team][Air_Superiority] > City[enemy][Air_Superiority])
-					{
-					    GangZoneShowForPlayer(i,gangzone,COLOR_GREEN);
-					    format(string, sizeof(string), "{6BE916} Air Superiority: %d%", City[team][Air_Superiority]);
-					    if(PlayerInfo[i][mylabel]==-1)
-						{
-                            
-						 //   SetPlayerObjectMaterialText(i, PlayerInfo[i][mylabel],string, 0, OBJECT_MATERIAL_SIZE_256x128,\"Arial", 28, 0, COLOR_GREEN, COLOR_GREEN, OBJECT_MATERIAL_TEXT_ALIGN_CENTER);
-						}
-					}
-					else if(City[enemy][Air_Superiority] > City[team][Air_Superiority])
-					{
-					    format(string, sizeof(string), "{FF0000} Air Superiority: %d%", City[team][Air_Superiority]);
-					    if(PlayerInfo[i][mylabel]==-1)
-						{
-					      
-						}
-					    GangZoneShowForPlayer(i,gangzone,COLOR_LIGHTRED);
-					}
-					else GangZoneShowForAll(gangzone,COLOR_GREY);
-					if(IsPlayerInAnyVehicle(i) && PlayerInfo[i][pDead]==false && Server[PreparePhase2]==true)
-					{
-					    new veh = GetPlayerVehicleID(i);
-					    if(GetCarFunctionNew(veh == 1 || veh == 2))
-					    {
-					        SCM(i,COLOR_LIGHTRED,"The Invasion begins! Get the Hell out of here!");
-					        GivePlayerWeapon(i,46,1);
-					     //   SetVehicleHealth(veh,0);
-						}
-					}
-					
-	            }
-	        }
-		}*/
 	return 1;
 }
 
-
+stock GetRandomNormaLWeatherID()
+{
+	new rand = random(18);
+	return rand;
+}
+stock FixHour(hour)
+{
+	hour = timeshift+hour;
+	if (hour < 0)
+	{
+		hour = hour+24;
+	}
+	else if (hour > 23)
+	{
+		hour = hour-24;
+	}
+	shifthour = hour;
+	return 1;
+}
+stock GetMonth(month)
+{
+	new month[12];
+    if(month == 1) { mtext = "Januar"; }
+	else if(month == 2) { mtext = "Februar"; }
+	else if(month == 3) { mtext = "Marz"; }
+	else if(month == 4) { mtext = "April"; }
+	else if(month == 5) { mtext = "Mai"; }
+	else if(month == 6) { mtext = "Juni"; }
+	else if(month == 7) { mtext = "Juli"; }
+	else if(month == 8) { mtext = "August"; }
+	else if(month == 9) { mtext = "September"; }
+	else if(month == 10) { mtext = "Oktober"; }
+	else if(month == 11) { mtext = "November"; }
+	else if(month == 12) { mtext = "Dezember"; }
+	return month;
+}
 stock GetEnemy(teamid)
 {
 	new enemy;
@@ -3170,74 +3464,6 @@ stock GetEnemy(teamid)
 	}
 	return enemy;
 }
-
-/*
-forward ProgressEnd(playerid,cpidd);
-public ProgressEnd(playerid,cpidd)
-{
-    Capture[cpidd][ProgressTime]++;
-	if(Capture[cpidd][ProgressTime] > MAX_CAPTURE_TIME)
-	{
-	    new string[128];
-	    if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) > GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))
-	    {
-	        // Gebiet erobert
-			format(string,sizeof(string),"[CAPTURE] Team %s captured a new Zone!",GetTeamName(Capture[cpidd][tattacker]));
-			SendClientMessageToAll(0xFFFFFFAA,string);
-		}
-        if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) < GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))
-	    {
-	        // Gebiet verteidigt
-			format(string,sizeof(string),"[CAPTURE] Team %s successfully defended their Zone!",GetTeamName(Capture[cpidd][tattacker]));
-			SendClientMessageToAll(0xFFFFFFAA,string);
-		}
-		if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker]) == GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender]))  // if wert == 1 return 1; Kampf um 10 sek verlängern?
-	    {
-	        // Gebiet gleichstand
-			format(string,sizeof(string),"[CAPTURE] Team %s successfully defended their Zone!",GetTeamName(Capture[cpidd][tattacker]));
-			SendClientMessageToAll(0xFFFFFFAA,string);
-		}
-		
-		if(GetTeamPlayersInZone(cpidd,Capture[cpidd][tattacker] ==0 && GetTeamPlayersInZone(cpidd,Capture[cpidd][tdefender] ==0)))
-	    {
-	        // Gebiet nobody there
-			format(string,sizeof(string),"[CAPTURE] Team %s stopped capturing a Zone!",GetTeamName(Capture[cpidd][tattacker]));
-			SendClientMessageToAll(0xFFFFFFAA,string);
-		}
-		for(new i = GetPlayerPoolSize(); i != -1; --i)
-		{
-		    if(IsPlayerConnected(i))
-			{
-			    if(PlayerInfo[i][pInCP]==cpidd)
-			    {
-			        KillTimer(PlayerInfo[i][pProgressTimer]);
-					DestroyPlayerProgressBar(i,PlayerInfo[i][pProgress]);
-				}
-			}
-		}
-		
-	 	Capture[cpidd][ActiveCapture]=0;
-	 	Capture[cpidd][kampfvorbei]=true;
-	 	
-	  //  SendClientMessage(playerid,-1,"Die Zone wurde erobert.");
-	    return 1;
-	}
-    Capture[cpidd][ProgressTime]=0;
-    for(new i = GetPlayerPoolSize(); i != -1; --i)
-		{
-		    if(IsPlayerConnected(i))
-			{
-			    if(PlayerInfo[i][pInCP]==cpidd)
-			    {
-			        SetPlayerProgressBarValue(i,PlayerInfo[i][pProgress],Capture[cpidd][ProgressTime]);
-					UpdatePlayerProgressBar(i,PlayerInfo[i][pProgress]);
-				}
-			}
-		}
-	
-	return 1;
-}
-*/
 forward LoadMaps();
 public LoadMaps()
 {
@@ -3634,6 +3860,82 @@ public LoadMaps()
 	CreateDynamicObject(9946,-35,-1777.5,0.5,0,0,156);
 	
 	//
+	
+	// Platforms for Boats (market on the Map + Airport for Airplanes on the Sea)
+	
+	
+	
+	
+	
+	CreateDynamicObject(10766,877.9000200,-2301.3999000,-0.4000000,0.0000000,0.0000000,100.0000000); //object(airport_10_sfse) (1)
+	CreateDynamicObject(10766,854.9000200,-2589.2000000,0.1000000,0.0000000,0.0000000,72.0000000); //object(airport_10_sfse) (2)
+	CreateDynamicObject(10766,757.2000100,-2856.8999000,0.6000000,0.0000000,0.0000000,62.0000000); //object(airport_10_sfse) (3)
+	CreateDynamicObject(10766,10.3000000,-2922.8999000,0.0000000,0.0000000,0.0000000,276.0000000); //object(airport_10_sfse) (5)
+	CreateDynamicObject(10766,111.4000000,-2664.8999000,0.0,0.0000000,0.0000000,290.0000000); //object(airport_10_sfse) (6)
+	CreateDynamicObject(10766,75.9000000,-2456.1001000,0.1000000,0.0000000,0.0000000,328.0000000); //object(airport_10_sfse) (7)
+	
+	
+	
+	CreateDynamicObject(10047,-23.1000000,-1723.0000000,35.1000000,0.0000000,0.0000000,0.0000000); //object(monlith_ground) (1)
+	CreateDynamicObject(10047,450.3526,-2466.2920,-1.0051,0.0000000,0.0000000,0.0000000); //object(monlith_ground) (2)
+	
+	
+	
+	
+	
+	CreateDynamicObject(9946,446.3999900,-2195.5000000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (5)
+	CreateDynamicObject(9946,-204.2000000,-1795.8000000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (10)  10766
+	CreateDynamicObject(9946,427.6000100,-2705.8000000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (3)
+	CreateDynamicObject(9946,694.0999800,-2675.8000000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (4)
+	CreateDynamicObject(9946,919.7999900,-2405.8999000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (6)
+	CreateDynamicObject(9946,868.9000200,-2802.3000000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (7)
+	CreateDynamicObject(9946,137.5000000,-2819.0000000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (8)
+	
+	CreateDynamicObject(9946,450.3526,-2466.2920,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,254.4466,-2331.7361,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,70.7634,-2176.7705,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,-64.0130,-1991.6416,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,219.5174,-1972.3711,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	
+	CreateDynamicMapIcon(446.3999900,-2195.5000000,1.0000000,48,-1,-1,-1,-1,50.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(-204.2000000,-1795.8000000,1.0000000,48,-1,-1,-1,-1,50.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(427.6000100,-2705.8000000,1.0000000,48,-1,-1,-1,-1,50.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(694.0999800,-2675.8000000,1.0000000,48,-1,-1,-1,-1,50.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(919.7999900,-2405.8999000,1.0000000,48,-1,-1,-1,-1,50.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(868.9000200,-2802.3000000,1.0000000,48,-1,-1,-1,-1,50.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(137.5000000,-2819.0000000,1.0000000,48,-1,-1,-1,-1,50.0,MAPICON_LOCAL);
+	
+	CreateDynamicMapIcon(450.3526,-2466.2920,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(254.4466,-2331.7361,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(70.7634,-2176.7705,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(-64.0130,-1991.6416,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(219.5174,-1972.3711,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	CreateDynamicMapIcon(554.6453,-1994.5844,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(543.9255,-2362.3350,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(536.6916,-2935.5364,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(318.0244,-3008.9116,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(316.4695,-3198.4011,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(485.1654,-3323.3726,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
+	CreateDynamicMapIcon(685.1534,-3163.8879,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
+
+	
+	CreateDynamicObject(9946,554.6453,-1994.5844,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,543.9255,-2362.3350,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,536.6916,-2935.5364,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,318.0244,-3008.9116,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,316.4695,-3198.4011,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,485.1654,-3323.3726,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,685.1534,-3163.8879,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
 }
 
 public OnPlayerLeaveDynamicCP(playerid, checkpointid)
@@ -4008,6 +4310,21 @@ public LoadGangZones2()
 }
 
 
+
+updateArtillery(id)
+{
+    new text[256];
+    format(text,sizeof(text), "Artillery\nID: %d\nMunition: %d\nDominated by Team %d\nActivated: %s" ,id,Artillery[id][ammuNition],GetTeamName(Artillery[id][dominatedByTeam]),((Artillery[id][activeShooting]==false)?("{6EF83C}No"):("{ff0000}Yes")));
+	if(Artillery[id][artillerylabel] != Text3D:-1)
+	{
+	    UpdateDynamic3DTextLabelText(Artillery[id][artillerylabel], COLOR_ORANGE, text);
+	}
+	else
+	{
+	    Artillery[id][artillerylabel] = CreateDynamic3DTextLabel(text, COLOR_ORANGE, Artillery[id][Art_PositonX],Artillery[id][Art_PositonY],Artillery[id][Art_PositonZ]+0.5, 10.0);
+	}
+	return 1;
+}
 updateGangZone(id) //continue?
 {
 //    new string[128];
@@ -4139,11 +4456,138 @@ public LoadArtillerys2()
 }
 
 
+forward LoadServerCars();
+public LoadServerCars()
+{
+    new query[128];
+    format(query,sizeof(query),"SELECT * FROM `ServerCars`");
+	mysql_pquery(handle, query, "LoadServerCarsNow", "");
+	return 1;
+}
+forward LoadServerCarsNow();
+public LoadServerCarsNow()
+{
+    new rows;
+    cache_get_row_count(rows);
+	if(rows)
+	{
+	    for(new i; i<rows; i++)
+    	{
+
+	     	new idx = getFreeVID();
+	     	if(idx !=-1)
+	     	{
+		     	cache_get_value_name_int(i, "v_dbid", ServerCar[idx][v_dbid]);
+		     	cache_get_value_name_int(i, "v_cartype", ServerCar[idx][v_cartype]);
+
+		     	cache_get_value_name_float(i, "v_PosX", ServerCar[idx][v_PosX]);
+		     	cache_get_value_name_float(i, "v_PosY", ServerCar[idx][v_PosY]);
+		     	cache_get_value_name_float(i, "v_PosZ", ServerCar[idx][v_PosZ]);
+		     	cache_get_value_name_float(i, "v_PosR", ServerCar[idx][v_PosR]);
+
+			   	cache_get_value_name_int(i, "v_color1", ServerCar[idx][v_color1]);
+		     	cache_get_value_name_int(i, "v_color2", ServerCar[idx][v_color2]);
+		     	cache_get_value_name_int(i, "v_function", ServerCar[idx][v_function]);
+
+		     	cache_get_value_name_int(i, "v_valid", ServerCar[idx][v_valid]);
+				if(ServerCar[idx][v_valid] !=0)
+				{
+			   		ServerCar[idx][v_localid] = CreateVehicle(ServerCar[idx][v_cartype],ServerCar[idx][v_PosX],ServerCar[idx][v_PosY],ServerCar[idx][v_PosZ],ServerCar[idx][v_PosR],ServerCar[idx][v_color1],ServerCar[idx][v_color2],-1);
+			   		SetCarAttachments(idx);
+				}
+				else
+				{
+				    new string[256];
+					mysql_format(handle, string, sizeof(string), "DELETE FROM `ServerCars` WHERE `v_dbid` = '%d'", ServerCar[idx][v_dbid]);
+					mysql_pquery(handle, string, "", "");
+				}
+
+			}
+	   	}
+	   	return 1;
+
+
+
+	}
+	return 1;
+	 // richtig ? i thin schon
+}
+
+getFreeVID()
+{
+	for(new i=0; i<sizeof(ServerCar); i++)
+	{
+	   if(ServerCar[i][v_dbid]==-1) return i;
+	}
+	print("Error: Maximale Anzahl an Server Autos erreicht.");
+
+	return -1;
+}
+stock SetCarAttachments(idx)
+{/*
+	new function = ServerCar[idx][v_function];
+	switch(function)
+	{
+	    case 1:
+	    {
+			if(ServerCar[idx][v_3dtextlabel]==Text3D:INVALID_3DTEXT_ID)
+			{
+			    ServerCar[idx][v_3dtextlabel] = Create3DTextLabel( "Taxi Company\n\nGet in to work as a Taxi Driver", COLOR_YELLOW, 0.0, 0.0, 0.0, 25.0, 0, 1 );
+		        Attach3DTextLabelToVehicle(ServerCar[idx][v_3dtextlabel],ServerCar[idx][v_localid],0.0, 0.0, 0.0);
+			}
+		}
+	}
+	if(ServerCar[idx][v_valid]==0 && ServerCar[idx][v_3dtextlabel]!=Text3D:INVALID_3DTEXT_ID)
+	{
+	    Delete3DTextLabel(ServerCar[idx][v_3dtextlabel]);
+	}*/
+}
+
+
+stock SavcCarToDataBase(idx)
+{
+	new query[128];
+    mysql_format(handle, query, sizeof(query), "INSERT INTO `ServerCars` (`v_dbid`, `v_valid`) VALUES ('%d', '%d')",idx,1);
+	mysql_query(handle, query);
+	SaveVehicle(idx);
+	return 1;
+}
+
+forward SaveVehicle(idx);
+public SaveVehicle(idx)
+{
+	new query[512];
+	if(ServerCar[idx][v_valid]==1)
+	{
+	    format(query,sizeof(query),"UPDATE ServerCars SET v_cartype='%d',v_PosX='%f',v_PosY='%f',v_PosZ='%f',v_PosR='%f',v_color1='%d',v_color1='%d',v_function='%d',v_valid='%d' WHERE v_dbid ='%d'",
+		ServerCar[idx][v_cartype],ServerCar[idx][v_PosX],ServerCar[idx][v_PosY],ServerCar[idx][v_PosZ],ServerCar[idx][v_PosR],ServerCar[idx][v_color1],ServerCar[idx][v_color2],ServerCar[idx][v_function],ServerCar[idx][v_valid],ServerCar[idx][v_dbid]);
+		mysql_pquery(handle, query);
+	}
+}
+
 
 
 public OnMissileFinished(Float:x,Float:y,Float:z)
 {
     CreateExplosion(x,y,z,2,20); //explosion
+    
+    
+    for(new i = 0; i<(sizeof(Artillery)); i++)
+	{
+	    if(Artillery[i][artid] != -1 && IsPointInRangeOfPoint(x,y,z,Artillery[i][Art_PositonX],Artillery[i][Art_PositonY],Artillery[i][Art_PositonZ],7.0)) // artillery destroyed by bomb
+	    {
+	        if(!Artillery[i][isEnabled])continue;
+            if(Artillery[i][artLocalID]==INVALID_OBJECT_ID)continue;
+
+			DestroyDynamicObject(Artillery[i][artLocalID]);
+
+			Artillery[i][artLocalID]=INVALID_OBJECT_ID;
+			
+			Artillery[i][isEnabled] = false;
+
+			break;
+		}
+	}
     return 1;
 }
 
@@ -4172,14 +4616,16 @@ public FireArtillery(artilleryid)
 		Artillery[arteid][ammuNition]--;
   		if(Artillery[arteid][ammuNition] <=0)
   		{
-  		    SendTeamMessage(Artillery[arteid][dominatedByTeam],"[ARTILLERY] Artillery with ID %d was deactivated, reason: lack of ammunition");  // could be send to team 0 (nobody) doesn't matter.
+  		    new text[128];
+  		    format(text,sizeof(text), "[ARTILLERY] Artillery with ID %d was deactivated, reason: lack of ammunition", id);
+  		    SendTeamMessage(Artillery[arteid][dominatedByTeam],text);  // could be send to team 0 (nobody) doesn't matter.
 		  	Artillery[arteid][activeShooting] = false;
 		}
 		
 		if(!Artillery[arteid][activeShooting]) return 0;
 
 		
-        new Random = random(21);
+        new Random = random(25);
         float(Random);
         
         new Float:FloatValue;
@@ -4493,11 +4939,14 @@ ocmd:adminteleport(playerid,params[])
     return 1;
 }
 
+ocmd:config(playerid,params[])
+{
+    if(!IsPlayerAdminEx(playerid,2))return SCM(playerid,COLOR_RED,"You are not permitted.");
+    ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG,DIALOG_STYLE_LIST,"Server-Config","Game-Mode\nPlayers\nServer Settings(Admin Level 3 required)","Continue","Exit");
+    return 1;
+}
 
-
-
-
-ocmd:setobjectrott(playerid,params[])
+ocmd:setobjectrott(playerid,params[])  // only for developers!
 {
 	new count,Float:fRollOffset,Float:fPitchOffset,Float:fYawOffset;
 	if(sscanf(params,"fff",fRollOffset,fPitchOffset,fYawOffset))return SendClientMessage(playerid,-1,"/setobjectrott [fRollOffset] [fPitchOffset] [fYawOffset]");
@@ -4517,7 +4966,95 @@ ocmd:setobjectrott(playerid,params[])
 }
 
 
+ocmd:createcar(playerid,params[]) // beim erstellen eines Taxis wird das textlabel erst nach serverneustart sichtbar
+{
+    if(!IsPlayerAdminEx(playerid,2))return SCM(playerid,COLOR_RED,"You are not permitted.");
+	new model,function,color1,color2;
+    if(sscanf(params, "dddd", model, function,color1,color2)) return SendClientMessage(playerid, COLOR_GREY, "Usage: /createcar <ModelID> <Function> <Color1> <Color2>");
 
+    if(function <=0 || function > 1)
+    {
+        SendClientMessage(playerid, COLOR_RED, "[Create Vehicle] Wrong Function ID!");
+        SCM(playerid,-1,"1 = Boat");
+        return 1;
+	}
+
+	new idx = getFreeVID();
+	if(idx == -1) return SCM(playerid,COLOR_RED,"[Create Vehicle] The maximum Number of Vehicles has been reached.");
+	if(GetPlayerInterior(playerid) || GetPlayerVirtualWorld(playerid) !=0) return SCM(playerid,COLOR_RED,"[Create Vehicle] Please leave your Interior / virtual World first.");
+	if(model < 400 || model > 611) return SCM(playerid,COLOR_RED,"[Create Vehicle] Model-ID only from 400 - 611.");
+	if(color1 < 0 || color1 > 255) return SCM(playerid,COLOR_RED,"[Create Vehicle] Wrong Color(1)!");
+	if(color2 < 0 || color2 > 255) return SCM(playerid,COLOR_RED,"[Create Vehicle] Wrong Color(2)!");
+
+	new Float:fX,Float:fY,Float:fZ,Float:fA;
+	GetPlayerPos(playerid,fX,fY,fZ),GetPlayerFacingAngle(playerid,fA);
+
+	ServerCar[idx][v_cartype] = model;
+    ServerCar[idx][v_PosX] = fX;
+	ServerCar[idx][v_PosY] = fY;
+	ServerCar[idx][v_PosZ] = fZ;
+	ServerCar[idx][v_PosR] = fA;
+	ServerCar[idx][v_color1] = color1;
+	ServerCar[idx][v_color2] = color2;
+	ServerCar[idx][v_function] = function;
+	ServerCar[idx][v_valid] = 1;
+	ServerCar[idx][v_dbid] = idx;
+	ServerCar[idx][v_3dtextlabel]=Text3D:INVALID_3DTEXT_ID;
+	ServerCar[idx][v_localid] = CreateVehicle(ServerCar[idx][v_cartype],ServerCar[idx][v_PosX],ServerCar[idx][v_PosY],ServerCar[idx][v_PosZ],ServerCar[idx][v_PosR],ServerCar[idx][v_color1],ServerCar[idx][v_color2],-1);
+	if(SavcCarToDataBase(idx))return SCM(playerid,COLOR_LIGHTBLUE,"You successfully created a new Vehicle!");
+
+	SetCarAttachments(idx);
+    //SendClientMessage(playerid, COLOR_RED, "Login unsuccessful, password is wrong!");
+    return 1;
+}
+
+ocmd:savevehpos(playerid,params[])   // setvehPos?
+{
+    if(!IsPlayerAdminEx(playerid,2))return SCM(playerid,COLOR_RED,"You are not permitted.");
+    if(!IsPlayerInAnyVehicle(playerid)) return SCM(playerid,COOLRED,"[SAVE VEHICLE] You aren't in any vehicle!");
+	new count,vehicle = GetPlayerVehicleID(playerid);
+    for(new i = GetVehiclePoolSize(); i > 0; i--) // kicks players out of car
+	{
+	    if(ServerCar[i][v_valid]==1  && ServerCar[i][v_localid]==vehicle)
+   		{
+			SaveVehicle(i);
+			count++;
+		}
+	}
+	if(count == 0) return SCM(playerid,COOLRED,"[SAVE VEHICLE] Couldn't save the vehicle!");
+	return 1;
+	//SetVehicleTORespawn works familar
+}
+ocmd:deletecar(playerid,params[])
+{
+    if(!IsPlayerAdminEx(playerid,2))return SCM(playerid,COLOR_RED,"You are not permitted.");
+	new vehicleid,count,idx;
+    if(sscanf(params, "d", vehicleid)) return SendClientMessage(playerid, COLOR_GREY, "Usage: /deletecar <vehicleID> ");
+
+	for(idx=0; idx<sizeof(ServerCar); idx++)
+	{
+ 		if(ServerCar[idx][v_valid]==1)
+   		{
+   		    if(ServerCar[idx][v_localid]==vehicleid)
+   		    {
+   		        ServerCar[idx][v_cartype] = 0;
+			    ServerCar[idx][v_PosX] = 0;
+				ServerCar[idx][v_PosY] = 0;
+				ServerCar[idx][v_PosZ] = 0;
+				ServerCar[idx][v_PosR] = 0;
+				ServerCar[idx][v_color1] = 0;
+				ServerCar[idx][v_color2] = 0;
+				ServerCar[idx][v_function] = 0;
+				ServerCar[idx][v_valid] = 0;
+				DestroyVehicle(ServerCar[idx][v_localid]);
+				SetCarAttachments(idx);
+				count++;
+		   	}
+   		}
+   	}//SendFormMessage
+	if(count>0)return SendFormMessage(playerid, COLOR_RED, "[Delete Vehicle] You successfully deleted Vehicle ID %d!", ServerCar[idx][v_localid]);
+	else return SCM(playerid,COLOR_RED,"[Delete Vehicle] Specified Vehicle could not be deleted!");
+}
 
 
 
