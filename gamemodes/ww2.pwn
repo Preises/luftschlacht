@@ -44,7 +44,11 @@ enum
 
 // Global Variabels
 
-new Text:TDEditor_TD[3];
+new Text:BoatTextDraw;
+new Text:PlanesTextDraw;
+new Text:ManPowerTextDraw;
+new Text:TankTextDraw;
+
 new startcounter;
 new gangzone;
 new timeshift = -1,shifthour;
@@ -128,13 +132,26 @@ new Float:SFEnemySpawn[][] = // Für LS
 
 // Player Variables
 
-new PlayerText:TDEditor_PTD[MAX_PLAYERS];
-new PlayerText:TeamCapturePoints[MAX_PLAYERS];
 new LastDriver[MAX_VEHICLES];
 new LastCar[MAX_PLAYERS];
 new PlayerText:PlayerBox[MAX_PLAYERS];
 
 new PlayerText:BombsTextDraw[MAX_PLAYERS];
+
+
+
+new PlayerText:PlanesTextDraw_Textt[MAX_PLAYERS];
+new PlayerText:BoatTextDraw_Text[MAX_PLAYERS];
+new PlayerText:ManPower_Text[MAX_PLAYERS];
+
+new PlayerText:Tank_Text[MAX_PLAYERS];
+
+
+
+
+
+
+
 
 new DroppingBombs[MAX_PLAYERS];
 
@@ -275,7 +292,9 @@ enum pDataEnum
 	Float:pTargetArtPos_X,
 	Float:pTargetArtPos_Y,
 	Float:pTargetArtPos_Z,
-	bool:IsConfiguringArtillery
+	bool:IsConfiguringArtillery,
+	FindPlaneAttempts,
+	findPlaneTimer
 }
 new PlayerInfo[MAX_PLAYERS][pDataEnum];
 
@@ -284,7 +303,10 @@ enum City_Enum
 	Air_Superiority, // get air superiority of a City !  > Description: Each city has 50% air superiority, so 100% together. If you shoot a plane, your team gets + 1% Air Superiority. If you're being shot down by an enemy your team loses 1%
 	LuftFlugzeuge,  // get numbers of planes of a City!
 	Captured,       // how many checkpoints your team captured in this round
-	Defended        // how many checkpoints were successfully defended after the enemy attemptet to capture it
+	Defended,        // how many checkpoints were successfully defended after the enemy attemptet to capture it
+	Boats, // numbers of boats
+	ManPower,
+	Tanks
 }
 new City[MAX_CITIES][City_Enum];
 
@@ -436,6 +458,13 @@ new ServerCar[MAX_SERVERCARS][ServerVehicleData];
 public OnGameModeInit()
 {
     maximumPlayerPool = 1000;
+	new hour,minute,second;
+	gettime(hour,minute,second);
+	FixHour(hour);
+	hour = shifthour;
+	timeHours = hour;
+	timeMinutes = minute;
+	SetWorldTime(timeHours);
 //	SetGameModeText("Deathmatch");
 	updater = SetTimer("UpdateGameMode",1000,1);
 	SetTimer("CheckAirWinners",2500,1);
@@ -558,35 +587,7 @@ public OnGameModeInit()
 	
 	
 	
-	//
-	
-	// flugzeug TextDraw
-	
 
-	TDEditor_TD[0] = TextDrawCreate(283.666687, -3.874080, "");
-	TextDrawTextSize(TDEditor_TD[0], 66.000000, 40.000000);
-	TextDrawAlignment(TDEditor_TD[0], 1);
-	TextDrawColor(TDEditor_TD[0], -1);
-	TextDrawSetShadow(TDEditor_TD[0], 0);
-	TextDrawBackgroundColor(TDEditor_TD[0], 1); // vorher 255
-	TextDrawFont(TDEditor_TD[0], 5);
-	TextDrawSetProportional(TDEditor_TD[0], 0);
-	TextDrawSetPreviewModel(TDEditor_TD[0], 476);
-	TextDrawSetPreviewRot(TDEditor_TD[0], 0.000000, 0.000000, 0.000000, 1.000000);
-	TextDrawSetPreviewVehCol(TDEditor_TD[0], 1, 1);
-	
-	
-	// die restlichen flugzeuge anzahl als %02d angeben
-	
-	TDEditor_TD[2] = TextDrawCreate(593.667236, 417.733123, "5:00");  // Zeit
-	TextDrawLetterSize(TDEditor_TD[2], 0.363333, 1.575111);
-	TextDrawAlignment(TDEditor_TD[2], 1);
-	TextDrawColor(TDEditor_TD[2], -1);
-	TextDrawSetShadow(TDEditor_TD[2], 0);
-	TextDrawBackgroundColor(TDEditor_TD[2], 255);
-	TextDrawFont(TDEditor_TD[2], 1);
-	TextDrawSetProportional(TDEditor_TD[2], 1);
-	TextDrawSetSelectable(TDEditor_TD[2], true);
 
 
 
@@ -632,7 +633,68 @@ public OnGameModeInit()
 	AddStaticVehicle(472,924.1375,-2381.9204,-0.1190,270.9054,32,32); // BOATLS_014
 	
 	
-	//
+	// // ManPower, Airplanes available, Boats available (SYMBOLS)
+	
+	
+	BoatTextDraw = TextDrawCreate(205.000000, -19.222227, ""); //Boat
+	TextDrawLetterSize(BoatTextDraw, 0.000000, 0.000000);
+	TextDrawTextSize(BoatTextDraw, 61.000000, 64.000000);
+	TextDrawAlignment(BoatTextDraw, 1);
+	TextDrawColor(BoatTextDraw, -1);
+	TextDrawSetShadow(BoatTextDraw, 0);
+	TextDrawSetOutline(BoatTextDraw, 0);
+	TextDrawBackgroundColor(BoatTextDraw, 1);
+	TextDrawFont(BoatTextDraw, 5);
+	TextDrawSetProportional(BoatTextDraw, 0);
+	TextDrawSetShadow(BoatTextDraw, 0);
+	TextDrawSetPreviewModel(BoatTextDraw, 430);
+	TextDrawSetPreviewRot(BoatTextDraw, 0.000000, 0.000000, 0.000000, 1.000000);
+	TextDrawSetPreviewVehCol(BoatTextDraw, 1, 1);
+
+	PlanesTextDraw = TextDrawCreate(178.000000, -30.007440, ""); //Planes
+	TextDrawLetterSize(PlanesTextDraw, 0.000000, 0.000000);
+	TextDrawTextSize(PlanesTextDraw, 53.000000, 78.000000);
+	TextDrawAlignment(PlanesTextDraw, 1);
+	TextDrawColor(PlanesTextDraw, -1);
+	TextDrawSetShadow(PlanesTextDraw, 0);
+	TextDrawSetOutline(PlanesTextDraw, 0);
+	TextDrawBackgroundColor(PlanesTextDraw, 1);
+	TextDrawFont(PlanesTextDraw, 5);
+	TextDrawSetProportional(PlanesTextDraw, 0);
+	TextDrawSetShadow(PlanesTextDraw, 0);
+	TextDrawSetPreviewModel(PlanesTextDraw, 476);
+	TextDrawSetPreviewRot(PlanesTextDraw, 0.000000, 0.000000, 0.000000, 1.000000);
+	TextDrawSetPreviewVehCol(PlanesTextDraw, 1, 1);
+
+	ManPowerTextDraw = TextDrawCreate(266.666656, 3.592589, ""); // Manpower
+	TextDrawLetterSize(ManPowerTextDraw, 0.000000, 0.000000);
+	TextDrawTextSize(ManPowerTextDraw, 56.000000, 17.000000);
+	TextDrawAlignment(ManPowerTextDraw, 1);
+	TextDrawColor(ManPowerTextDraw, -1);
+	TextDrawSetShadow(ManPowerTextDraw, 0);
+	TextDrawSetOutline(ManPowerTextDraw, 0);
+	TextDrawBackgroundColor(ManPowerTextDraw, 1);
+	TextDrawFont(ManPowerTextDraw, 5);
+	TextDrawSetProportional(ManPowerTextDraw, 0);
+	TextDrawSetShadow(ManPowerTextDraw, 0);
+	TextDrawSetPreviewModel(ManPowerTextDraw, 287);
+	TextDrawSetPreviewRot(ManPowerTextDraw, 0.000000, 0.000000, 0.000000, 1.000000);
+	
+	
+	TankTextDraw = TextDrawCreate(249.999893, -9.681481, ""); // Tank
+	TextDrawLetterSize(TankTextDraw, 0.000000, 0.000000);
+	TextDrawTextSize(TankTextDraw, 29.000000, 46.000000);
+	TextDrawAlignment(TankTextDraw, 1);
+	TextDrawColor(TankTextDraw, -1);
+	TextDrawSetShadow(TankTextDraw, 0);
+	TextDrawSetOutline(TankTextDraw, 0);
+	TextDrawBackgroundColor(TankTextDraw, 1);
+	TextDrawFont(TankTextDraw, 5);
+	TextDrawSetProportional(TankTextDraw, 0);
+	TextDrawSetShadow(TankTextDraw, 0);
+	TextDrawSetPreviewModel(TankTextDraw, 432);
+	TextDrawSetPreviewRot(TankTextDraw, 0.000000, 0.000000, 0.000000, 1.000000);
+	TextDrawSetPreviewVehCol(TankTextDraw, 1, 1);
 	return 1;
 }
 
@@ -692,27 +754,6 @@ public OnPlayerConnect(playerid)
 	}
 	else Kick(playerid);
 	
-	TDEditor_PTD[playerid] = CreatePlayerTextDraw(playerid, 307.666717, 19.096334, "100");
-	PlayerTextDrawLetterSize(playerid, TDEditor_PTD[playerid], 0.400000, 1.600000);
-	PlayerTextDrawAlignment(playerid, TDEditor_PTD[playerid], 1);
-	PlayerTextDrawColor(playerid, TDEditor_PTD[playerid], -1);
-	PlayerTextDrawSetShadow(playerid, TDEditor_PTD[playerid], 0);
-	PlayerTextDrawBackgroundColor(playerid, TDEditor_PTD[playerid], 255);
-	PlayerTextDrawFont(playerid, TDEditor_PTD[playerid], 1);
-	PlayerTextDrawSetProportional(playerid, TDEditor_PTD[playerid], 1);
-	
-	PlayerInfo[playerid][mylabel] = CreatePlayerObject(playerid,19353,-188.2051,-1469.9440,55.7322,0,0,90.0,300);
-	
-	TeamCapturePoints[playerid]= CreatePlayerTextDraw(playerid, 545.333435, 416.903442, "0/1_Captured");
-	PlayerTextDrawLetterSize(playerid, TeamCapturePoints[playerid], 0.335333, 1.730961);
-  //  PlayerTextDrawLetterSize(playerid, TeamCapturePoints[playerid], 0.299332, 1.587552);
-	PlayerTextDrawTextSize(playerid, TeamCapturePoints[playerid], -143.000000, 0.000000);
-	PlayerTextDrawAlignment(playerid, TeamCapturePoints[playerid], 1);
-	PlayerTextDrawColor(playerid, TeamCapturePoints[playerid], -1);
-	PlayerTextDrawSetShadow(playerid, TeamCapturePoints[playerid], 0);
-	PlayerTextDrawBackgroundColor(playerid, TeamCapturePoints[playerid], 255);
-	PlayerTextDrawFont(playerid, TeamCapturePoints[playerid], 1);
-	PlayerTextDrawSetProportional(playerid, TeamCapturePoints[playerid], 1);
 	
 	
 	
@@ -750,9 +791,75 @@ public OnPlayerConnect(playerid)
 	PlayerTextDrawSetShadow(playerid, BombsTextDraw[playerid], 0);
 	  
 	  
+ 	//
 	  
-	  //
 	  
+	  
+
+	
+	// ManPower, Airplanes available, Boats available (NUMBERS)
+	
+	
+	PlanesTextDraw_Textt[playerid] = CreatePlayerTextDraw(playerid, 198.666610, 21.585195, "30"); //planes
+	PlayerTextDrawLetterSize(playerid, PlanesTextDraw_Textt[playerid], 0.236000, 1.268148);
+	PlayerTextDrawAlignment(playerid, PlanesTextDraw_Textt[playerid], 1);
+	PlayerTextDrawColor(playerid, PlanesTextDraw_Textt[playerid], -1);
+	PlayerTextDrawSetShadow(playerid, PlanesTextDraw_Textt[playerid], 0);
+	PlayerTextDrawSetOutline(playerid, PlanesTextDraw_Textt[playerid], 0);
+	PlayerTextDrawBackgroundColor(playerid, PlanesTextDraw_Textt[playerid], 255);
+	PlayerTextDrawFont(playerid, PlanesTextDraw_Textt[playerid], 1);
+	PlayerTextDrawSetProportional(playerid, PlanesTextDraw_Textt[playerid], 1);
+	PlayerTextDrawSetShadow(playerid, PlanesTextDraw_Textt[playerid], 0);
+	
+	
+
+	BoatTextDraw_Text[playerid] = CreatePlayerTextDraw(playerid, 230.333267, 22.000005, "25"); //boat
+	PlayerTextDrawLetterSize(playerid, BoatTextDraw_Text[playerid], 0.236000, 1.268148);
+	PlayerTextDrawAlignment(playerid, BoatTextDraw_Text[playerid], 1);
+	PlayerTextDrawColor(playerid, BoatTextDraw_Text[playerid], -1);
+	PlayerTextDrawSetShadow(playerid, BoatTextDraw_Text[playerid], 0);
+	PlayerTextDrawSetOutline(playerid, BoatTextDraw_Text[playerid], 0);
+	PlayerTextDrawBackgroundColor(playerid, BoatTextDraw_Text[playerid], 255);
+	PlayerTextDrawFont(playerid, BoatTextDraw_Text[playerid], 1);
+	PlayerTextDrawSetProportional(playerid, BoatTextDraw_Text[playerid], 1);
+	PlayerTextDrawSetShadow(playerid, BoatTextDraw_Text[playerid], 0);
+	
+	
+
+	ManPower_Text[playerid] = CreatePlayerTextDraw(playerid, 287.333343, 22.000001, "300"); //manpower
+	PlayerTextDrawLetterSize(playerid, ManPower_Text[playerid], 0.236000, 1.268148);
+	PlayerTextDrawAlignment(playerid, ManPower_Text[playerid], 1);
+	PlayerTextDrawColor(playerid, ManPower_Text[playerid], -1);
+	PlayerTextDrawSetShadow(playerid, ManPower_Text[playerid], 0);
+	PlayerTextDrawSetOutline(playerid, ManPower_Text[playerid], 0);
+	PlayerTextDrawBackgroundColor(playerid, ManPower_Text[playerid], 255);
+	PlayerTextDrawFont(playerid, ManPower_Text[playerid], 1);
+	PlayerTextDrawSetProportional(playerid, ManPower_Text[playerid], 1);
+	PlayerTextDrawSetShadow(playerid, ManPower_Text[playerid], 0);
+	
+	
+	
+	
+	Tank_Text[playerid] = CreatePlayerTextDraw(playerid, 258.999938, 22.000003, "12");  //Tanks
+	PlayerTextDrawLetterSize(playerid, Tank_Text[playerid], 0.236000, 1.268148);
+	PlayerTextDrawAlignment(playerid, Tank_Text[playerid], 1);
+	PlayerTextDrawColor(playerid, Tank_Text[playerid], -1);
+	PlayerTextDrawSetShadow(playerid, Tank_Text[playerid], 0);
+	PlayerTextDrawSetOutline(playerid, Tank_Text[playerid], 0);
+	PlayerTextDrawBackgroundColor(playerid, Tank_Text[playerid], 255);
+	PlayerTextDrawFont(playerid, Tank_Text[playerid], 1);
+	PlayerTextDrawSetProportional(playerid, Tank_Text[playerid], 1);
+	PlayerTextDrawSetShadow(playerid, Tank_Text[playerid], 0);
+	
+	
+	
+	
+	
+
+	
+	
+	
+	//
 	  
     for(new id=0; id<MAX_ZONES; id++)
 	{
@@ -834,8 +941,6 @@ public OnPlayerSpawn(playerid)
 	 
 	if(PlayerInfo[playerid][pClassSelection] == false)
 	{
-
-
 	    if(GetPlayerTeam(playerid) == 255 && Server[ModeStarted]==true)
 	    {
 	        if(GetTeamPlayers(1) > GetTeamPlayers(2))
@@ -858,10 +963,20 @@ public OnPlayerSpawn(playerid)
 			{
 				SetTimerEx("SpawnKillEnd", 8000, 0,"i",playerid);
 			}
+			
+			PlayerTextDrawShow(playerid,PlanesTextDraw_Textt[playerid]);
+			PlayerTextDrawShow(playerid,BoatTextDraw_Text[playerid]);
+			PlayerTextDrawShow(playerid,ManPower_Text[playerid]);
+			PlayerTextDrawShow(playerid,Tank_Text[playerid]);
+
+			TextDrawShowForPlayer(playerid,BoatTextDraw);
+			TextDrawShowForPlayer(playerid,PlanesTextDraw);
+			TextDrawShowForPlayer(playerid,ManPowerTextDraw);
+			TextDrawShowForPlayer(playerid,TankTextDraw);
 		//	SetPlayerWorldBounds(playerid, 1027.9858, -488.1284, -728.1127, -2107.9824);
 			
 			new Random;
-			switch(GetPlayerTeam(playerid))
+			switch(GetPlayerTeam(playerid)) // ignored by ManPower
    			{
    			    
       			case 1:
@@ -885,6 +1000,16 @@ public OnPlayerSpawn(playerid)
 		{
             PlayerInfo[playerid][pDead] = false;
 		}
+		
+		new teamid = GetPlayerTeam(playerid);
+		
+		if(City[teamid][ManPower] < 1)
+		{
+			SCM(playerid,COOLRED,"[MANPOWER] Your Team has no more manpower, so you can't be spawned!");
+			SCM(playerid,COLOR_GREEN,"[MANPOWER] You were set to spectate mode!");
+			//SetPlayerSpectating() // function incoming
+			return 1;
+		}
 		switch(PlayerInfo[playerid][pJob])
 		{
 		    case 0:  // foot Soldier
@@ -896,6 +1021,7 @@ public OnPlayerSpawn(playerid)
 				GivePlayerWeapon(playerid,25,999);
 				GivePlayerWeapon(playerid,31,999);
 				GivePlayerWeapon(playerid,34,10);
+				SetPlayerToTeamSpawn(playerid);
 			}
 			
 			case 1: //Pilot
@@ -923,21 +1049,39 @@ public OnPlayerSpawn(playerid)
 				GivePlayerWeapon(playerid,22,999);
 				GivePlayerWeapon(playerid,25,999);
 				SCM(playerid,COLOR_GREEN,"[SUPPLY DELIVERER] Get in a Truck!");
+				SetPlayerToTeamSpawn(playerid);
 			}
 		}
 		
 	}
 	return 1;
 }
-
+stock SetPlayerToTeamSpawn(playerid)
+{
+    new Random;
+    switch(GetPlayerTeam(playerid))
+    {
+        case 1:
+        {
+            Random = random(sizeof(LSSpawns));
+            SetPlayerPos(playerid, LSSpawns[Random][0], LSSpawns[Random][1], LSSpawns[Random][2]);
+            SetPlayerFacingAngle(playerid, LSSpawns[Random][3]);
+            SetPlayerColor(playerid,COLOR_YELLOW);
+        }
+        case 2:
+        {
+            Random = random(sizeof(SFSpawns));
+            SetPlayerPos(playerid, SFSpawns[Random][0], SFSpawns[Random][1], SFSpawns[Random][2]);
+            SetPlayerFacingAngle(playerid, SFSpawns[Random][3]);
+            SetPlayerColor(playerid,COLOR_BLUE);
+        }
+    }
+}
 stock SetSpawnReady(playerid)
 {
     SetCameraBehindPlayer(playerid);
 	SetPlayerVirtualWorld(playerid,0);
 	SetPlayerInterior(playerid,0);
-	PlayerTextDrawHide(playerid,TDEditor_PTD[playerid]);
-	TextDrawHideForPlayer(playerid,TDEditor_TD[0]); // testweise raus (unschuldig)
-	TextDrawShowForPlayer(playerid,TDEditor_TD[1]);
 	TogglePlayerControllable(playerid,true);
 			
 	return 1;
@@ -985,6 +1129,27 @@ stock GetAirSuperiority()
 	else return 999;
 }
 
+
+
+stock GetAirPlanes(teamid)
+{
+	return City[teamid][LuftFlugzeuge];
+}
+
+stock GetBoats(teamid)
+{
+	return City[teamid][Boats];
+}
+
+stock GetManPower(teamid)
+{
+	return City[teamid][ManPower];
+}
+
+stock GetTanks(teamid)
+{
+	return City[teamid][Tanks];
+}
 forward CheckAirWinners();
 public CheckAirWinners()
 {
@@ -1006,7 +1171,6 @@ public CheckAirWinners()
 				        //	SetTimer("NotifyPlayers",5000,0);
 
 		   		Server[LandGefecht]=true;
-		     	CreateCaptureFlag();
 		       	SetTimer("SpawnEveryOneAndStartTimer",5000,0);
 		       	Server[EtappenWinner]=gewinner;
 				return 1;
@@ -1025,7 +1189,6 @@ public CheckAirWinners()
 	     	BurnAllPlanes();
 			        //	SetTimer("NotifyPlayers",5000,0);
 	   		Server[LandGefecht]=true;
-	     	CreateCaptureFlag();
 	       	SetTimer("SpawnEveryOneAndStartTimer",5000,0);
 	       	Server[EtappenWinner]=gewinner;
 			return 1;
@@ -1096,16 +1259,34 @@ public SAMPRespawnVehicle(vehicle)
 		}	SetPlayerVirtualWorld(playerid,0);
 	}*/
 }
+
+
 forward PutPlayerInPlane(playerid);
 public PutPlayerInPlane(playerid)
 {
 	if(Server[LandGefecht]==true) return 1;
 	if(IsPlayerInAnyVehicle(playerid)) return 1;
+	if(PlayerInfo[playerid][FindPlaneAttempts] > 4)
+	{
+	    SCM(playerid,COLOR_GREEN,"[SEARCHING PLANE] Looks like there is no plane available now.");
+	    SCM(playerid,COLOR_GREEN,"[SEARCHING PLANE] You were set to respawn.");
+	    SetPlayerJob(playerid,0); //soldier
+	    SpawnPlayer(playerid);
+	    PlayerInfo[playerid][FindPlaneAttempts] = 0;
+	    if(PlayerInfo[playerid][findPlaneTimer] != -1)
+	    {
+	    	KillTimer(PlayerInfo[playerid][findPlaneTimer]);
+	    	PlayerInfo[playerid][findPlaneTimer] = -1;
+		}
+	    return 1;
+
+	}
     new veh = GetFreePlane(playerid);
     if(veh == INVALID_VEHICLE_ID)
 	{
-		SCM(playerid,COLOR_LIGHTRED,"[SEARCHING PLANE] There was no free Plane found. Retrying in 5 Seconds..."); // COOLRED genutzt mal xD LOL SOL LANGE WTF
-		SetTimerEx("Repeat",5000,0,"i",playerid);
+		SCM(playerid,COLOR_LIGHTRED,"[SEARCHING PLANE] There was no free Plane found. Retrying in 15 Seconds..."); // COOLRED genutzt mal xD LOL SOL LANGE WTF
+		PlayerInfo[playerid][findPlaneTimer] = SetTimerEx("Repeat",15000,0,"i",playerid);
+		PlayerInfo[playerid][FindPlaneAttempts]++;
 		return 1;
 	}
 	PutPlayerInVehicle(playerid,veh,0);
@@ -1137,20 +1318,7 @@ public Repeat(playerid)
 {
     PutPlayerInPlane(playerid);
 }
-stock CreateCaptureFlag()
-{
-    TDEditor_TD[1] = TextDrawCreate(524.333251, 415.918670, "");
-	TextDrawTextSize(TDEditor_TD[1], 23.000000, 22.000000);
-	TextDrawAlignment(TDEditor_TD[1], 1);
-	TextDrawColor(TDEditor_TD[1], -1);
-	TextDrawSetShadow(TDEditor_TD[1], 0);
-	TextDrawBackgroundColor(TDEditor_TD[1], 1); // auch vorher 255
-	TextDrawFont(TDEditor_TD[1], 5);
-	TextDrawSetProportional(TDEditor_TD[1], 0);
-	TextDrawSetPreviewModel(TDEditor_TD[1], 19306);
-	TextDrawSetPreviewRot(TDEditor_TD[1], 0.000000, 0.000000, 0.000000, 1.000000);
-	return 1;
-}
+
 stock BurnAllPlanes()
 {
     for(new i = 0; i < MAX_VEHICLES; i++) // grl0e scheiss egal beide gleich groß LOL!
@@ -1176,7 +1344,14 @@ stock DestroyAllPlanes()
 			}
 		}
 	}
-}/*
+}
+stock SetPlayerJob(playerid,job)
+{
+	PlayerInfo[playerid][pJob]=job;
+	return 1;
+}
+
+/*
 stock GetFreePlane(playerid)
 {
     new team = GetPlayerTeam(playerid);
@@ -1227,10 +1402,10 @@ stock GetFreePlane(playerid)
 		        {
 					new Float: vPosX, Float:vPosY,Float:vPosZ;
 					GetVehiclePos(VehicleInfo[i][LocalID],vPosX,vPosY,vPosZ);
-					if(IsPointInRangeOfPoint(vPosX,vPosY,vPosZ,286.9475,-1804.6365,5.0574,30.0) || IsPointInRangeOfPoint(vPosX,vPosY,vPosZ,-327.0711,-1424.0215,14.8314,30.0))
-					{
+				//	if(IsPointInRangeOfPoint(vPosX,vPosY,vPosZ,286.9475,-1804.6365,5.0574,170.0) || IsPointInRangeOfPoint(vPosX,vPosY,vPosZ,-327.0711,-1424.0215,14.8314,170.0)) // since there are naval bases, useless. --17.06.2020
+				//	{
 		            	return VehicleInfo[i][LocalID];
-					}
+					//}
 				}
 			}
 		}
@@ -1250,7 +1425,7 @@ stock GetFreeTank(playerid)
 		    {
 		        new Float:health;
 			    GetVehicleHealth(VehicleInfo[i][LocalID], health);
-		        if(VehicleInfo[i][teamidd] == team && health >= 1000)
+		        if(VehicleInfo[i][teamidd] == team && health >= 700)
 		        {
 					new Float: vPosX, Float:vPosY,Float:vPosZ;
 					GetVehiclePos(VehicleInfo[i][LocalID],vPosX,vPosY,vPosZ);
@@ -1323,8 +1498,14 @@ stock PrepareGameMode()
     Server[LandGefecht]=false;
     Server[CanSpawn]=false;
     Server[FiveSecondStart]=false;
-    City[1][LuftFlugzeuge]=55;  // temp vorher 55
-    City[2][LuftFlugzeuge]=55;
+    City[1][LuftFlugzeuge]=3;  // temp vorher 55
+    City[2][LuftFlugzeuge]=3;
+    
+    City[1][ManPower]=325;  // temp vorher 55
+    City[2][ManPower]=325;
+    
+    City[1][Boats]=30;  // temp vorher 55
+    City[2][Boats]=30;
     
     City[1][Air_Superiority]=50;
     City[2][Air_Superiority]=50;
@@ -1570,12 +1751,18 @@ public OnPlayerDeath(playerid, killerid, reason)
     PlayerInfo[playerid][pDead]=true;
     PlayerInfo[playerid][AlreadySpawned]=false;
 	SCM(playerid,COLOR_LIGHTRED,"You died!");
-	PlayerTextDrawHide(playerid,TDEditor_PTD[playerid]); // Eigene Team Flugzeuge (Luftschlacht)
-	TextDrawHideForPlayer(playerid,TDEditor_TD[0]); // FlugZeug Symbol ( LuftSchlacht) // testweise raus (unschuldig)
-	TextDrawHideForPlayer(playerid,TDEditor_TD[1]); // Flagge (LandGefecht)
-	PlayerTextDrawHide(playerid,TeamCapturePoints[playerid]);
 	
-	
+	if(GetPlayerTeam(playerid)!=255)
+	{
+	    new teamid = GetPlayerTeam(playerid);
+	    City[teamid][ManPower]--;
+	    if(City[teamid][ManPower] <=0 && City[teamid][ManPower]!=-1)
+ 		{
+ 			City[teamid][ManPower]=-1;
+   			SendTeamMessage(teamid,"[TEAM-MESSAGE] We lack of manpower! We can not deploy any more man.");
+		}
+	    
+	}
 	if(killerid != INVALID_PLAYER_ID && killerid != playerid)
 	{
 	    PlayerInfo[killerid][pKills]++;
@@ -1654,45 +1841,50 @@ stock IsTeamMate(playerid)
     if(GetPlayerTeam(playerid) == 1 || GetPlayerTeam(playerid) == 2) return 1;
     else return 0;
 }
-public OnVehicleDeath(vehicleid, killerid)
+public OnVehicleDeath(vehicleid, killerid)  // to complicated to NOT-Hardcode in that case...
 {
     new playerid = LastDriver[vehicleid];
-	if(GetCarFunctionNew(vehicleid) !=0 && Server[LandGefecht]==false)
-	{
-		//new playerid = GetVehicleDriver(vehicleid);
-		
-//		new string[128];
-		if(playerid == INVALID_PLAYER_ID) return 1;//SendClientMessageToAll(-1,"Nicht Erfolgt.");
-		
-//		SetPlayerHealth(playerid,0);
-		new team = GetPlayerTeam(playerid);
-		new teamenemy = GetEnemy(team);
-//	    SCM(playerid,-1,"Du bist der täter");
-		if(killerid == INVALID_PLAYER_ID)
+    if(playerid == INVALID_PLAYER_ID) return 0;
+    if(GetPlayerTeam(playerid) == 255) return 0;
+    
+    new team = GetPlayerTeam(playerid);
+//	new teamenemy = GetEnemy(team);
+	new model = GetVehicleModel(vehicleid);
+	
+	
+	if(model == 476) // Plane
+ 	{
+		City[team][LuftFlugzeuge]--;
+		if(City[team][LuftFlugzeuge] < 1) { DestroyVehicle(vehicleid); }
+		if(City[team][LuftFlugzeuge] <=0 && City[team][LuftFlugzeuge]!=-1)
 		{
-			if(IsTeamMate(playerid))
-			{
-		    	City[team][LuftFlugzeuge]--;
-		    	City[team][Air_Superiority]--;
-		    	City[teamenemy][Air_Superiority]++;
-			}
+  			City[team][LuftFlugzeuge]=-1;
+            SendTeamMessage(team,"[TEAM-MESSAGE] The last available Aircraft on our side was destroyed! We're running on reserves!");
 		}
-	    if(GetPlayerTeam(killerid)!=255 && killerid != INVALID_PLAYER_ID)
-	    {
-			new opfer=GetPlayerTeam(playerid),teamyo=GetEnemy(opfer);
-			
-			City[teamyo][Air_Superiority]++;
-			
-			City[opfer][Air_Superiority]--;
-			
-			City[opfer][LuftFlugzeuge]--;
-			
-			//GiveMoneySave (Killerod)
-		}
-		SetTimerEx("SAMPRespawnVehicle",2500,0,"i",vehicleid);
-
-		
 	}
+	if(model == 430 || model == 473 || model == 484 || model == 493 || model == 595)
+	{
+ 		City[team][Boats]--;
+ 		if(City[team][Boats] < 1) { DestroyVehicle(vehicleid); }
+ 		if(City[team][Boats] <=0 && City[team][Boats]!=-1)
+ 		{
+ 			City[team][Boats]=-1;
+   			SendTeamMessage(team,"[TEAM-MESSAGE] All Boats on our side have been destroyed!");
+		}
+	}
+	if(model == 432)// tanks (rhino)
+	{
+ 		City[team][Tanks]--;
+ 		if(City[team][Tanks] < 1) { DestroyVehicle(vehicleid); }
+ 		if(City[team][Tanks] <=0 && City[team][Tanks]!=-1)
+ 		{
+ 			City[team][Tanks]=-1;
+   			SendTeamMessage(team,"[TEAM-MESSAGE] All Tanks on our side have been destroyed! We're running on reserves!");
+		}
+	}
+	SetTimerEx("SAMPRespawnVehicle",2500,0,"i",vehicleid);
+	
+	//GetVehicleDriver?
 	return 1;
 }
 
@@ -2235,11 +2427,13 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 		}
 		case DIALOG_ADMIN_CONFIG_GAMEMODE:
 		{
+		    //if(!response) return 0;
+		    if(!response) return 0;
 		    switch(listitem)
 		    {
 		        case 0: // set Servertime
 		        {
-		            ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETTIME,DIALOG_STYLE_LIST,"Set Time","{FFFFFF}Please Insert a {B45F04}Weather {FFFFFF}ID:\n(Can be found be Google.\nIDs are between 0-23","{58D3F7}Set","Exit");
+		            ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETTIME,DIALOG_STYLE_INPUT,"Set Time","{FFFFFF}Please Insert a {B45F04}Weather {FFFFFF}ID:\n(Can be found be Google.\nIDs are between 0-23","{58D3F7}Set","Exit");
 				}
 				case 1: // set Weather
 		        {
@@ -2252,6 +2446,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 					{
 					    SCM(playerid,COLOR_WHITE,"[SET WEATHER] Weather {3ADF00}unfreezed");
 					    weatherFreezed = false;
+					    changeWeather = 0;
 						format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has unfreezed the weather",GetName(playerid),playerid);
 						SendAdminReport(string,1);
 					}
@@ -2259,6 +2454,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 					{
 					    SCM(playerid,COLOR_WHITE,"[SET WEATHER] Weather {FF0000}freezed");
 					    weatherFreezed = true;
+					    changeWeather = 0;
 						format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has freezed the weather",GetName(playerid),playerid);
 						SendAdminReport(string,1);
 					}
@@ -2271,6 +2467,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 					{
 					    SCM(playerid,COLOR_WHITE,"[SET WORLD TIME] World Time {3ADF00}unfreezed");
 					    timeFreezed = false;
+					    changeTime = 0;
 						format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has unfreezed the world time",GetName(playerid),playerid);
 						SendAdminReport(string,1);
 					}
@@ -2278,6 +2475,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 					{
 					    SCM(playerid,COLOR_WHITE,"[SET WORLD TIME] World Time {FF0000}freezed");
 					    timeFreezed = true;
+					    changeTime = 0;
 						format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has freezed the world time",GetName(playerid),playerid);
 						SendAdminReport(string,1);
 					}
@@ -2304,6 +2502,8 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 		
 		case DIALOG_ADMIN_CONFIG_SETMAXPLYRS:
 		{
+		
+		    if(!response) return 0;
 		    if(!IsPlayerAdminEx(playerid,3))return SCM(playerid,COLOR_RED,"You are not permitted.");
 		    if(!strval(inputtext) || strval(inputtext) < 0 || strval(inputtext)>1000) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETMAXPLYRS,DIALOG_STYLE_INPUT,"Set Maximum Players\n LIMIT: 0-1000","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} between 0-1000","{58D3F7}Set","Exit");
 		    if(!IsNumeric(inputtext)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETMAXPLYRS,DIALOG_STYLE_INPUT,"Set Maximum Players\n LIMIT: 0-1000","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} between 0-1000","{58D3F7}Set","Exit");
@@ -2321,6 +2521,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 		}
 		case DIALOG_ADMIN_CONFIG_SETWEATHER:
 		{
+		    if(!response) return 0;
 		    if(!strval(inputtext) || strval(inputtext) < 0 || strval(inputtext)>20) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETWEATHER,DIALOG_STYLE_INPUT,"Set Weather {FF0000}Only Numbers (0-20)","{FFFFFF}Please Insert a {B45F04}Weather {FFFFFF}ID:\n(Can be found be Google.\nIDs are between 0-20","{58D3F7}Set","Exit");
 		    if(!IsNumeric(inputtext)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETWEATHER,DIALOG_STYLE_INPUT,"Set Weather {FF0000}Only Numbers (0-20)","{FFFFFF}Please Insert a {B45F04}Weather {FFFFFF}ID:\n(Can be found be Google.\nIDs are between 0-20","{58D3F7}Set","Exit");
 		    SetWeather(strval(inputtext));  // strval inputtext would be numeric. OFC
@@ -2330,13 +2531,15 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 			
 			
 			new sstring[156];
-   			strcat(sstring,"{FFFFFF}Set Server time\nSet Server Weather\nSet Maximum Player Count\nArtillery Configuration(MENU)\nVehicle Configuration(MENU)");
-      		ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_GAMEMODE,DIALOG_STYLE_INPUT,"Game-Mode Settings",sstring,"{58D3F7}Continue","Exit");
+      		
+      		strcat(sstring,"{FFFFFF}Set Server time\nSet Server Weather\nFreeze Weather\nFreeze Time\nSet Maximum Player Count\nArtillery Configuration(MENU)\nVehicle Configuration(MENU)");
+        	ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_GAMEMODE,DIALOG_STYLE_LIST,"Game-Mode Settings",sstring,"{58D3F7}Continue","Exit");
 			
 		    
 		}
 		case DIALOG_ADMIN_CONFIG_SETTIME:
 		{
+		    if(!response) return 0;
 		    if(!strval(inputtext) || strval(inputtext) < 0 || strval(inputtext)>23) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETWEATHER,DIALOG_STYLE_INPUT,"Set Time {FF0000}Only Numbers (0-23)","{FFFFFF}Please Insert a {B45F04}Time {FFFFFF}\n(Can be found be Google.\nIDs are between 0-23","{58D3F7}Set","Exit");
 		    if(!IsNumeric(inputtext)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETWEATHER,DIALOG_STYLE_INPUT,"Set Time {FF0000}Only Numbers (0-23)","{FFFFFF}Please Insert a {B45F04}Time {FFFFFF}\n(Can be found be Google.\nIDs are between 0-23","{58D3F7}Set","Exit"); //valid weatherid required
 		    timeHours = strval(inputtext); // strval inputtext would be numeric. OFC
@@ -2344,13 +2547,14 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 			format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted the World Time to %d",GetName(playerid),playerid,strval(inputtext));
 			SendAdminReport(string,1);
 			new sstring[156];
-   			strcat(sstring,"{FFFFFF}Set Server time\nSet Server Weather\nSet Maximum Player Count\nArtillery Configuration(MENU)\nVehicle Configuration(MENU)");
-      		ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_GAMEMODE,DIALOG_STYLE_INPUT,"Game-Mode Settings",sstring,"{58D3F7}Continue","Exit");
+   			strcat(sstring,"{FFFFFF}Set Server time\nSet Server Weather\nFreeze Weather\nFreeze Time\nSet Maximum Player Count\nArtillery Configuration(MENU)\nVehicle Configuration(MENU)");
+      		ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_GAMEMODE,DIALOG_STYLE_LIST,"Game-Mode Settings",sstring,"{58D3F7}Continue","Exit");
 
 
 		}
 		case DIALOG_ADMIN_CONFIG_GAMEMODE_V:
 		{
+		    if(!response) return 0;
 		    switch(listitem)
 		    {
 		        case 0: // Respawn All Vehicles
@@ -2576,6 +2780,8 @@ public OnUserLogin(playerid)
 		SendClientMessage(playerid, 0x00FF00FF, "[Account] You logged in.");
 		ResetPlayerMoney(playerid);
 		GivePlayerMoney(playerid, PlayerInfo[playerid][pMoney]);
+		
+		
 		//SpawnPlayer(playerid);
 	}
 	return 1;
@@ -2653,6 +2859,13 @@ stock ResetPlayerVariables(playerid)
 	
 	PlayerInfo[playerid][pBoxShown] = false;
 	PlayerInfo[playerid][IsConfiguringArtillery] = false;
+	PlayerInfo[playerid][FindPlaneAttempts] = 0;
+	PlayerInfo[playerid][findPlaneTimer] = -1;
+	
+	
+	
+	
+	SetPlayerTeam(playerid,255);
 	
 	
 	
@@ -3378,28 +3591,109 @@ public UpdateGameMode()
 	
 	for(new i = GetPlayerPoolSize(); i != -1; --i)
 	{
-	    if(IsPlayerConnected(i) && !timeFreezed)
+	    if(IsPlayerConnected(i))
 	    {
 	        SetPlayerTime(i,timeHours,timeMinutes);
 	        SetPlayerWeather(i,WorldWeather);
+	        
+	        
+	        if(GetPlayerTeam(i)!=255)
+	        {
+	            new teamid = GetPlayerTeam(i);
+				new teamPlanes = GetAirPlanes(teamid),teamBoats = GetBoats(teamid),teamManPower = GetManPower(teamid),teamTanks = GetTanks(teamid);
+	            new enemyTeam = GetEnemy(teamid);
+				new enemyPlanes = GetAirPlanes(enemyTeam),enemyBoats = GetBoats(enemyTeam),enemyManPower = GetManPower(enemyTeam),enemyTanks = GetTanks(enemyTeam);
+	            new tdstring[32];
+	            
+
+				if(teamPlanes >= enemyPlanes)
+				{
+				    format(tdstring, sizeof(tdstring), "%02d", enemyPlanes);
+				    PlayerTextDrawSetString(i, PlanesTextDraw_Textt[i], tdstring);
+				    PlayerTextDrawColor(i, PlanesTextDraw_Textt[i], COLOR_RED);
+				    PlayerTextDrawShow(i,PlanesTextDraw_Textt[i]);
+				}
+				else if(teamPlanes < enemyPlanes)
+				{
+				    format(tdstring, sizeof(tdstring), "%02d", teamPlanes);
+				    PlayerTextDrawSetString(i, PlanesTextDraw_Textt[i], tdstring);
+				    PlayerTextDrawColor(i, PlanesTextDraw_Textt[i], COLOR_BLUE);
+				    PlayerTextDrawShow(i,PlanesTextDraw_Textt[i]);
+				}
+				if(teamBoats >= enemyBoats)
+				{
+				    format(tdstring, sizeof(tdstring), "%02d", enemyBoats);
+				    PlayerTextDrawSetString(i, BoatTextDraw_Text[i], tdstring);
+				    PlayerTextDrawColor(i, BoatTextDraw_Text[i], COLOR_RED);
+				    PlayerTextDrawShow(i,BoatTextDraw_Text[i]);
+				}
+				else if(teamBoats < enemyBoats)
+				{
+				    format(tdstring, sizeof(tdstring), "%02d", teamBoats);
+				    PlayerTextDrawSetString(i, BoatTextDraw_Text[i], tdstring);
+				    PlayerTextDrawColor(i, BoatTextDraw_Text[i], COLOR_BLUE);
+				    PlayerTextDrawShow(i,BoatTextDraw_Text[i]);
+				}
+				
+				if(teamManPower >= enemyManPower)
+				{
+				    format(tdstring, sizeof(tdstring), "%02d", enemyManPower);
+				    PlayerTextDrawSetString(i, ManPower_Text[i], tdstring);
+				    PlayerTextDrawColor(i, ManPower_Text[i], COLOR_RED);
+				    PlayerTextDrawShow(i,ManPower_Text[i]);
+				}
+				else if(teamManPower < enemyManPower)
+				{
+				    format(tdstring, sizeof(tdstring), "%02d", teamManPower);
+				    PlayerTextDrawSetString(i, ManPower_Text[i], tdstring);
+				    PlayerTextDrawColor(i, ManPower_Text[i], COLOR_BLUE);
+				    PlayerTextDrawShow(i,ManPower_Text[i]);
+				}
+				
+				
+				if(teamTanks >= enemyTanks)
+				{
+				    format(tdstring, sizeof(tdstring), "%02d", enemyTanks);
+				    PlayerTextDrawSetString(i, Tank_Text[i], tdstring);
+				    PlayerTextDrawColor(i, Tank_Text[i], COLOR_RED);
+				    PlayerTextDrawShow(i,Tank_Text[i]);
+				}
+				else if(teamTanks < enemyTanks)
+				{
+				    format(tdstring, sizeof(tdstring), "%02d", teamTanks);
+				    PlayerTextDrawSetString(i, Tank_Text[i], tdstring);
+				    PlayerTextDrawColor(i, Tank_Text[i], COLOR_BLUE);
+				    PlayerTextDrawShow(i,Tank_Text[i]);
+				}
+				
+				
+				
+				
+				
+
+			}
+
 		}
 	}
-	
+
 	if(changeTime > 59)
 	{
-		new year, month,day;
-		getdate(year, month, day);
- 		new hour,minute,second;
-		gettime(hour,minute,second);
-		FixHour(hour);
-		hour = shifthour;
-		
-		timeHours = hour;
-		timeMinutes = minute;
+	    if(!timeFreezed)
+	    {
+			new year, month,day;
+			getdate(year, month, day);
+	 		new hour,minute,second;
+			gettime(hour,minute,second);
+			FixHour(hour);
+			hour = shifthour;
+			timeHours = hour;
+			timeMinutes = minute;
+		}
+		changeTime = 0;
+		SetWorldTime(timeHours);
 		
 		if(changeWeather > 7200) // 2hours
 		{
-		
 		    new newWeather = GetRandomNormaLWeatherID();
 		    
 		    if(weatherFreezed)
@@ -3883,19 +4177,19 @@ public LoadMaps()
 	
 	
 	
-	CreateDynamicObject(9946,446.3999900,-2195.5000000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (5)
-	CreateDynamicObject(9946,-204.2000000,-1795.8000000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (10)  10766
-	CreateDynamicObject(9946,427.6000100,-2705.8000000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (3)
-	CreateDynamicObject(9946,694.0999800,-2675.8000000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (4)
-	CreateDynamicObject(9946,919.7999900,-2405.8999000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (6)
-	CreateDynamicObject(9946,868.9000200,-2802.3000000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (7)
-	CreateDynamicObject(9946,137.5000000,-2819.0000000,1.0000000,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) (8)
+	CreateDynamicObject(9946,446.3999900,-2195.5000000,1.0000000,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) (5)
+	CreateDynamicObject(9946,-204.2000000,-1795.8000000,1.0000000,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) (10)  10766
+	CreateDynamicObject(9946,427.6000100,-2705.8000000,1.0000000,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) (3)
+	CreateDynamicObject(9946,694.0999800,-2675.8000000,1.0000000,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) (4)
+	CreateDynamicObject(9946,919.7999900,-2405.8999000,1.0000000,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) (6)
+	CreateDynamicObject(9946,868.9000200,-2802.3000000,1.0000000,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) (7)
+	CreateDynamicObject(9946,137.5000000,-2819.0000000,1.0000000,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) (8)
 	
-	CreateDynamicObject(9946,450.3526,-2466.2920,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
-	CreateDynamicObject(9946,254.4466,-2331.7361,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
-	CreateDynamicObject(9946,70.7634,-2176.7705,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
-	CreateDynamicObject(9946,-64.0130,-1991.6416,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
-	CreateDynamicObject(9946,219.5174,-1972.3711,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,450.3526,-2466.2920,1.0,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,254.4466,-2331.7361,1.0,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,70.7634,-2176.7705,1.0,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,-64.0130,-1991.6416,1.0,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,219.5174,-1972.3711,1.0,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) ()
 	
 	CreateDynamicMapIcon(446.3999900,-2195.5000000,1.0000000,48,-1,-1,-1,-1,50.0,MAPICON_LOCAL);
 	CreateDynamicMapIcon(-204.2000000,-1795.8000000,1.0000000,48,-1,-1,-1,-1,50.0,MAPICON_LOCAL);
@@ -3929,13 +4223,13 @@ public LoadMaps()
 	CreateDynamicMapIcon(685.1534,-3163.8879,1.0,48,-1,-1,-1,-1,500.0,MAPICON_LOCAL);
 
 	
-	CreateDynamicObject(9946,554.6453,-1994.5844,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
-	CreateDynamicObject(9946,543.9255,-2362.3350,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
-	CreateDynamicObject(9946,536.6916,-2935.5364,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
-	CreateDynamicObject(9946,318.0244,-3008.9116,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
-	CreateDynamicObject(9946,316.4695,-3198.4011,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
-	CreateDynamicObject(9946,485.1654,-3323.3726,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
-	CreateDynamicObject(9946,685.1534,-3163.8879,1.0,0.0000000,0.0000000,0.0000000); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,554.6453,-1994.5844,1.0,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,543.9255,-2362.3350,1.0,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,536.6916,-2935.5364,1.0,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,318.0244,-3008.9116,1.0,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,316.4695,-3198.4011,1.0,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,485.1654,-3323.3726,1.0,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) ()
+	CreateDynamicObject(9946,685.1534,-3163.8879,1.0,0.0000000,0.0000000,0.0000000,-1,-1,-1,5000.0); //object(pyrground_sfe) ()
 }
 
 public OnPlayerLeaveDynamicCP(playerid, checkpointid)
@@ -4614,7 +4908,7 @@ public FireArtillery(artilleryid)
 		
 		
 		Artillery[arteid][ammuNition]--;
-  		if(Artillery[arteid][ammuNition] <=0)
+  		if(Artillery[arteid][ammuNition] <=0 && Artillery[arteid][activeShooting])
   		{
   		    new text[128];
   		    format(text,sizeof(text), "[ARTILLERY] Artillery with ID %d was deactivated, reason: lack of ammunition", id);
