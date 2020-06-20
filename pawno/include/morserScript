@@ -1,0 +1,96 @@
+/*  SA-MP Mörser Include
+ *
+ *  (c) Copyright 2019, Kaliber
+ *
+ */
+/******************************************************************************/
+#if defined _missile_included
+    #endinput
+#endif
+#define _missile_included
+/******************************************************************************/
+#if !defined _samp_included
+    #include <a_samp>
+#endif
+/******************************************************************************/
+#define MISSILE_SPEED 500
+#define MAX_MISSILE_HEIGHT 50
+/******************************************************************************/
+static stock route[100],r_idx;
+
+stock ShowRoute(Float:x,Float:y,Float:z, Float:x2,Float:y2,Float:z2)
+{
+	if(r_idx != 0) DestroyRoute();
+	
+    new Float:tx, Float:ty, Float:tz;
+    
+    new Float:dis = VectorSize(x-x2,y-y2,z-z2);
+    
+    new Float:step = floatdiv(dis,sizeof(route));
+    
+    new Float:a = atan2(y-y2,x-x2)-270.0;
+    
+    new Float:sin = floatdiv(180,sizeof(route));
+    
+	for(new i,Float:t=step,Float:s; i<sizeof(route); i++,t+=step,s+=sin)
+	{
+	    tx = x + t * floatsin(-a, degrees);
+	    ty = y + t * floatcos(-a, degrees);
+	    tz = z + 50 * floatsin(s, degrees);
+		route[r_idx++] = CreateDynamicObject(1598,tx,ty,tz,0,0,0);
+	}
+	return 1;
+}
+stock DestroyRoute()
+{
+	for(new i; i<sizeof(route); i++) DestroyDynamicObject(route[i]);
+	r_idx=0;
+	return 1;
+}
+/******************************************************************************/
+stock StartMissile(Float:x,Float:y,Float:z, Float:x2,Float:y2,Float:z2)
+{
+    new Float:dis = VectorSize(x-x2,y-y2,z-z2);
+
+    new Float:step = floatdiv(dis,sizeof(route));
+
+    new Float:a = atan2(y-y2,x-x2)-270.0;
+
+    new Float:sin = floatdiv(180,sizeof(route));
+
+	new obj = CreateDynamicObject(345,x,y,z,0,0,a,-1,-1,-1);
+	
+	SetTimerEx(!"@fly",100,0,!"iifffffffffff",obj,0,a,x,y,z,step,step,0,sin,x2,y2,z2);
+	return obj;
+}
+
+static @fly(obj,i,Float:a,
+			Float:x,Float:y,Float:z,
+			Float:t,Float:step,
+			Float:s,Float:sin,
+			Float:ax,Float:ay,Float:az);
+		@fly(obj,i,Float:a,
+			Float:x,Float:y,Float:z,
+			Float:t,Float:step,
+			Float:s,Float:sin,
+			Float:ax,Float:ay,Float:az)
+{
+
+    if(i==sizeof(route))
+	{
+	    DestroyDynamicObject(obj),OnMissileFinished(ax,ay,az);
+	    return 0;
+	}
+
+	new Float:tx = x + t * floatsin(-a, degrees),
+	    Float:ty = y + t * floatcos(-a, degrees),
+    	Float:tz = z + MAX_MISSILE_HEIGHT * floatsin(s, degrees);
+    	
+	MoveDynamicObject(obj,tx,ty,tz,MISSILE_SPEED);
+	
+	SetTimerEx(!"@fly",30,0,!"iifffffffffff",obj,i+1,a,x,y,z,t+step,step,s+sin,sin,ax,ay,az);
+	return 1;
+}
+
+forward OnMissileFinished(Float:x,Float:y,Float:z);
+/******************************************************************************/
