@@ -35,7 +35,16 @@ enum
     DIALOG_ADMIN_CONFIG_GAMEMODE_VH, // set vehicles health
     DIALOG_ADMIN_CONFIG_SETWEATHER,
     DIALOG_ADMIN_CONFIG_SETTIME,
-    DIALOG_ADMIN_CONFIG_SETMAXPLYRS // set maximum player amount on server
+    DIALOG_ADMIN_CONFIG_SETMAXPLYRS, // set maximum player amount on server
+    DIALOG_ADMIN_CONFIG_ART1,  // configure only one artillery (DIALOGS , 1-4)
+    DIALOG_ADMIN_CONFIG_ART2,
+    DIALOG_ADMIN_CONFIG_ART3,
+    DIALOG_ADMIN_CONFIG_ART4,
+    DIALOG_ADMIN_CONFIG_ART_2,
+    DIALOG_ADMIN_CONFIG_ART,
+    DIALOG_ADMIN_CONFIG_ART_ALL,
+    DIALOG_ADMIN_CONFIG_ART_ALl2,
+    DIALOG_CHOOSE_CLASS
     
 }
 
@@ -294,7 +303,8 @@ enum pDataEnum
 	Float:pTargetArtPos_Z,
 	bool:IsConfiguringArtillery,
 	FindPlaneAttempts,
-	findPlaneTimer
+	findPlaneTimer,
+	gamePoints
 }
 new PlayerInfo[MAX_PLAYERS][pDataEnum];
 
@@ -1021,6 +1031,9 @@ public OnPlayerSpawn(playerid)
 				GivePlayerWeapon(playerid,25,999);
 				GivePlayerWeapon(playerid,31,999);
 				GivePlayerWeapon(playerid,34,10);
+				new string[356];
+				format(string,sizeof(string),"{FFFFFF}Class\t{FFFFFF}Points needed\t{FFFFFF}Can select\n{FFFFFF}Assault\t{31B404}[0]\t{31B404}Yes\n{FFFFFF}Heavy\t{31B404}[0]\t{31B404}Yes\n{FFFFFF}Sniper\t{31B404}[0]\t{31B404}Yes\n{FFFFFF}Select Hero[...]\t{31B404}[2.000-6.000]\t{31B404}%s",((PlayerInfo[playerid][gamePoints]<2000)?("{FF0000}No"):("{31B404}Yes")));
+				ShowPlayerDialog(playerid, DIALOG_CHOOSE_CLASS, DIALOG_STYLE_TABLIST_HEADERS, "{FFFFFF}Choose your {31B404}Class:",string,"Select", "");
 				SetPlayerToTeamSpawn(playerid);
 			}
 			
@@ -2407,6 +2420,13 @@ stock GetWeatherName(weatherid) // very accurat
 	}
 	return weatherName;
 }
+
+stock IsValidArtillery(_artid)
+{
+	if(_artid == -1) return 0;
+	if(Artillery[_artid][artid] == -1) return 0;
+	return 1;
+}
 public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 {
 	switch(dialogid)
@@ -2483,14 +2503,15 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 				case 4: // set Maximum Player COunt -- poolSize
 		        {
 		            if(!IsPlayerAdminEx(playerid,3))return SCM(playerid,COLOR_RED,"You are not permitted.");
-		            if(GetPlayerPoolSize() < maximumPlayerPool) return SCM(playerid,COOLRED,"[SET MAXIMUM PLAYERS] The maximum amount can't be lower than the actual player count.");
-		            
-		            
 		            
 		            ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETMAXPLYRS,DIALOG_STYLE_INPUT,"Set Maximum Players","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} between 0-1000","{58D3F7}Set","Exit");
 					
 				}
-				case 5: // vehicle configruation
+				case 5:
+				{
+				    ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_ART,DIALOG_STYLE_LIST,"Artillery Configuration","{FFFFFF}Select Artillery\nAll Artillerys","{58D3F7}Continue","Exit");
+				}
+				case 6: // vehicle configruation
 		        {
 		            new sstring[156];
 	                strcat(sstring,"{FFFFFF}Respawn All Vehioces\nDestroy All Vehicles\nExplode all Vehicles\nSet all Vehicles to value Health...\nReplace all Planes with ID...\nReplace all Tanks with ID...");
@@ -2500,6 +2521,182 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 			}
 		}
 		
+		case DIALOG_ADMIN_CONFIG_ART:
+		{
+		    if(!response) return 0;
+			switch(listitem)
+			{
+			    case 0:
+			    {
+			        ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_ART2,DIALOG_STYLE_INPUT,"Enter Artillery ID","{FFFFFF}Please Insert a {B45F04}Artillery ID {FFFFFF}","{58D3F7}Continue","Exit");
+				}
+				case 1:
+				{
+				    ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_ART_ALL,DIALOG_STYLE_LIST,"{All Artillerys} Which action should be done my Lord?","{FFFFFF}Set Muniton of All\nStart all\nStop All\nEnable All\nDisable All","{58D3F7}Set","Exit");
+				}
+			}
+		}
+		case DIALOG_ADMIN_CONFIG_ART_ALL:
+		{
+            if(!response) return 0;
+            new string[128];
+            switch(listitem)
+            {
+                case 0:
+                {
+                    ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_ART_ALl2,DIALOG_STYLE_INPUT,"Set Munition for All Artillerys","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} which is higher than {B45F04}Zero","{58D3F7}Set","Exit");
+				}
+				case 1:
+                {
+                    for(new i = 0; i<sizeof(Artillery);i++)
+					{
+					    if(IsValidArtillery(i))
+					    {
+					        Artillery[i][activeShooting]=true;
+					        updateArtillery(i);
+						}
+					}
+					format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted ALL Artillery's to be {3ADF00}started",GetName(playerid),playerid);
+					SendAdminReport(string,1);
+				}
+				case 2:
+                {
+                    for(new i = 0; i<sizeof(Artillery);i++)
+					{
+					    if(IsValidArtillery(i))
+					    {
+					        Artillery[i][activeShooting]=false;
+					        updateArtillery(i);
+						}
+					}
+					format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted ALL Artillery's to be {FF0000}stopped",GetName(playerid),playerid);
+					SendAdminReport(string,1);
+				}
+				case 3:
+                {
+                    for(new i = 0; i<sizeof(Artillery);i++)
+					{
+					    if(IsValidArtillery(i))
+					    {
+					        Artillery[i][isEnabled]=true;
+					        updateArtillery(i);
+						}
+					}
+					format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted ALL Artillery's to be {3ADF00}enabled",GetName(playerid),playerid);
+					SendAdminReport(string,1);
+				}
+				case 4:
+                {
+                    for(new i = 0; i<sizeof(Artillery);i++)
+					{
+					    if(IsValidArtillery(i))
+					    {
+					        Artillery[i][isEnabled]=false;
+					        updateArtillery(i);
+						}
+					}
+					format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted ALL Artillery's to be {FF0000}disabled",GetName(playerid),playerid);
+					SendAdminReport(string,1);
+				}
+			}
+		}
+		case DIALOG_ADMIN_CONFIG_ART_ALl2:
+		{
+		    if(!response) return 0;
+		    if(!IsNumeric(inputtext)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_ART_ALl2,DIALOG_STYLE_INPUT,"Set Munition for All Artillerys\n{FF0000}Must be a number","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} which is higher than {B45F04}Zero","{58D3F7}Set","Exit");
+		    if(strval(inputtext) < 0) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_ART_ALl2,DIALOG_STYLE_INPUT,"Set Munition for All Artillerys\n{FF0000}Must be greater than -1","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} which is higher than {B45F04}Zero","{58D3F7}Set","Exit");
+		    
+		    new newAmount = strval(inputtext),string[128];
+		    
+		    format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted Amount of ALL Artillery's munition to %d",GetName(playerid),playerid,newAmount);
+			SendAdminReport(string,1);
+		    
+		    for(new i = 0; i<sizeof(Artillery);i++)
+			{
+   				if(IsValidArtillery(i))
+			    {
+       			    Artillery[i][ammuNition] = newAmount;
+       			    updateArtillery(i);
+				}
+			}
+		    
+		}
+		case DIALOG_ADMIN_CONFIG_ART2:
+		{
+		    if(!response) return 0;
+		    
+		    if(!IsNumeric(inputtext)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_ART2,DIALOG_STYLE_INPUT,"Enter Artillery ID\n{FF0000}Must be a Number!","{FFFFFF}Please Insert a {B45F04}Artillery ID {FFFFFF}","{58D3F7}Continue","Exit");
+		    
+			new artillery_id = strval(inputtext);
+		    if(!IsValidArtillery(artillery_id)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_ART2,DIALOG_STYLE_INPUT,"Enter Artillery ID\n{FF0000}Artillery is Invalid!","{FFFFFF}Please Insert a {B45F04}Artillery ID {FFFFFF}","{58D3F7}Continue","Exit");
+		    ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_ART3,DIALOG_STYLE_LIST,"Artillery Configuration!","{FFFFFF}Set Munition\nStart/Stop Artillery\nEnable/Disable Artillery","{58D3F7}Set","Exit");
+		    SetPVarInt(playerid,"Artillery_admin_id",artillery_id);
+		    
+		}
+		
+		case DIALOG_ADMIN_CONFIG_ART3:
+		{
+            if(!response){DeletePVar(playerid,"Artillery_admin_id"); return 0;}
+            new artillery_id = GetPVarInt(playerid,"Artillery_admin_id");
+            new string[128];
+            switch(listitem)
+            {
+                case 0:
+                {
+                    ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_ART4,DIALOG_STYLE_INPUT,"Artillery Configuration:: Set Muniton","{FFFFFF}Enter a Amount, which is higher than 0","{58D3F7}Set","Exit");
+				}
+				case 1:
+                {
+                    if(Artillery[artillery_id][isEnabled])
+                    {
+                        Artillery[artillery_id][isEnabled] = false;
+                        format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted Artillery (ID: %d) to be {FF0000}deactivated",GetName(playerid),playerid,artillery_id);
+                        SendAdminReport(string,1);
+                        updateArtillery(artillery_id);
+					}
+					else
+					{
+					    Artillery[artillery_id][isEnabled] = true;
+					    format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted Artillery (ID: %d) to be {00FF40}activated",GetName(playerid),playerid,artillery_id);
+					    SendAdminReport(string,1);
+					    updateArtillery(artillery_id);
+					}
+				}
+				case 2:
+                {
+                    if(Artillery[artillery_id][activeShooting])
+                    {
+                        Artillery[artillery_id][activeShooting] = false;
+                        format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted Artillery (ID: %d) to be {FF0000}not shoot",GetName(playerid),playerid,artillery_id);
+                        SendAdminReport(string,1);
+                        updateArtillery(artillery_id);
+					}
+					else
+					{
+					    Artillery[artillery_id][activeShooting] = true;
+					    format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted Artillery (ID: %d) to {00FF40}shoot",GetName(playerid),playerid,artillery_id);
+					    SendAdminReport(string,1);
+					    updateArtillery(artillery_id);
+					}
+				}
+			}
+		}
+		case DIALOG_ADMIN_CONFIG_ART4:
+		{
+		    if(!response){DeletePVar(playerid,"Artillery_admin_id"); return 0;}
+		    if(!IsNumeric(inputtext)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_ART4,DIALOG_STYLE_INPUT,"Artillery Configuration:: Set Muniton\n{FF0000}Input must be a number!","{FFFFFF}Enter a Amount, which is higher than 0","{58D3F7}Set","Exit");
+		    if(strval(inputtext) < 0) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_ART4,DIALOG_STYLE_INPUT,"Artillery Configuration:: Set Muniton\n{FF0000}Number must be higher than -1!","{FFFFFF}Enter a Amount, which is higher than 0","{58D3F7}Set","Exit");
+		    
+		    new artillery_id = GetPVarInt(playerid,"Artillery_admin_id");
+		    new amount = strval(inputtext);
+		    
+		    new string[128];
+			format(string,sizeof(string),"[ADMIN-REPORT] Admin %s(%d) has setted Amount of Artillery's (ID: %d) Muntion from %d to %d",GetName(playerid),playerid,amount,artillery_id,Artillery[artillery_id][ammuNition],amount);
+			SendAdminReport(string,1);
+			
+			Artillery[artillery_id][ammuNition] = amount;
+		    
+		}
 		case DIALOG_ADMIN_CONFIG_SETMAXPLYRS:
 		{
 		
@@ -2507,7 +2704,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 		    if(!IsPlayerAdminEx(playerid,3))return SCM(playerid,COLOR_RED,"You are not permitted.");
 		    if(!strval(inputtext) || strval(inputtext) < 0 || strval(inputtext)>1000) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETMAXPLYRS,DIALOG_STYLE_INPUT,"Set Maximum Players\n LIMIT: 0-1000","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} between 0-1000","{58D3F7}Set","Exit");
 		    if(!IsNumeric(inputtext)) return ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETMAXPLYRS,DIALOG_STYLE_INPUT,"Set Maximum Players\n LIMIT: 0-1000","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} between 0-1000","{58D3F7}Set","Exit");
-		    if(GetPlayerPoolSize() < maximumPlayerPool)
+		    if(GetPlayerPoolSize() < maximumPlayerPool) //if(GetPlayerPoolSize() < maximumPlayerPool) return SCM(playerid,COOLRED,"[SET MAXIMUM PLAYERS] The maximum amount can't be lower than the actual player count.");
 			{
 				SCM(playerid,COOLRED,"[SET MAXIMUM PLAYERS] The maximum amount can't be lower than the actual player count.");
 				ShowPlayerDialog(playerid,DIALOG_ADMIN_CONFIG_SETMAXPLYRS,DIALOG_STYLE_INPUT,"Set Maximum Players","{FFFFFF}Please Insert a {B45F04}Number {FFFFFF} between 0-1000","{58D3F7}Set","Exit");
@@ -2861,6 +3058,9 @@ stock ResetPlayerVariables(playerid)
 	PlayerInfo[playerid][IsConfiguringArtillery] = false;
 	PlayerInfo[playerid][FindPlaneAttempts] = 0;
 	PlayerInfo[playerid][findPlaneTimer] = -1;
+	
+	
+	PlayerInfo[playerid][gamePoints] = false;
 	
 	
 	
@@ -4161,12 +4361,12 @@ public LoadMaps()
 	
 	
 	
-	CreateDynamicObject(10766,877.9000200,-2301.3999000,-0.4000000,0.0000000,0.0000000,100.0000000); //object(airport_10_sfse) (1)
-	CreateDynamicObject(10766,854.9000200,-2589.2000000,0.1000000,0.0000000,0.0000000,72.0000000); //object(airport_10_sfse) (2)
-	CreateDynamicObject(10766,757.2000100,-2856.8999000,0.6000000,0.0000000,0.0000000,62.0000000); //object(airport_10_sfse) (3)
-	CreateDynamicObject(10766,10.3000000,-2922.8999000,0.0000000,0.0000000,0.0000000,276.0000000); //object(airport_10_sfse) (5)
-	CreateDynamicObject(10766,111.4000000,-2664.8999000,0.0,0.0000000,0.0000000,290.0000000); //object(airport_10_sfse) (6)
-	CreateDynamicObject(10766,75.9000000,-2456.1001000,0.1000000,0.0000000,0.0000000,328.0000000); //object(airport_10_sfse) (7)
+	CreateDynamicObject(10766,877.9000200,-2301.3999000,-0.4000000,0.0000000,0.0000000,100.0000000,-1,-1,-1,5000.0); //object(airport_10_sfse) (1)
+	CreateDynamicObject(10766,854.9000200,-2589.2000000,0.1000000,0.0000000,0.0000000,72.0000000,-1,-1,-1,5000.0); //object(airport_10_sfse) (2)
+	CreateDynamicObject(10766,757.2000100,-2856.8999000,0.6000000,0.0000000,0.0000000,62.0000000,-1,-1,-1,5000.0); //object(airport_10_sfse) (3)
+	CreateDynamicObject(10766,10.3000000,-2922.8999000,0.0000000,0.0000000,0.0000000,276.0000000,-1,-1,-1,5000.0); //object(airport_10_sfse) (5)
+	CreateDynamicObject(10766,111.4000000,-2664.8999000,0.0,0.0000000,0.0000000,290.0000000,-1,-1,-1,5000.0); //object(airport_10_sfse) (6)
+	CreateDynamicObject(10766,75.9000000,-2456.1001000,0.1000000,0.0000000,0.0000000,328.0000000,-1,-1,-1,5000.0); //object(airport_10_sfse) (7)
 	
 	
 	
@@ -4907,7 +5107,7 @@ public FireArtillery(artilleryid)
 		}
 		
 		
-		Artillery[arteid][ammuNition]--;
+		if(Artillery[arteid][activeShooting]) {Artillery[arteid][ammuNition]--;}
   		if(Artillery[arteid][ammuNition] <=0 && Artillery[arteid][activeShooting])
   		{
   		    new text[128];
