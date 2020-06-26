@@ -304,7 +304,10 @@ enum pDataEnum
 	bool:IsConfiguringArtillery,
 	FindPlaneAttempts,
 	findPlaneTimer,
-	gamePoints
+	gamePoints,
+	playerClass,  // Class 0 = Assault Class 1 = Heavy Class 2 = Sniper Class 3 = Agent Class 4 = Hero
+	pHoldingObject,
+	pWeaponSkill   // a general wepaon skill for ALLL weapons!
 }
 new PlayerInfo[MAX_PLAYERS][pDataEnum];
 
@@ -358,7 +361,12 @@ enum VehicleEnum{
 	vehType,
 	neededJob,
 	LocalID,
-	bombs
+	bombs,
+	resource_Assualt,
+	resource_Heavy,
+	resource_Sniper,
+	resource_Agent,
+	weaponResources[3] // 0 = Aussalt, 1 = Heavy, 2 = Sniper, 							3 = Agent
 }
 new VehicleInfo[MAX_VEHICLES][VehicleEnum];
 
@@ -465,9 +473,44 @@ enum ServerVehicleData {
 }
 new ServerCar[MAX_SERVERCARS][ServerVehicleData];
 
+
+
+
+
+
+
+
+enum MunitonBoxSystem{
+
+	muni_id,
+	muniListID,
+	muni_LocalID,   // Object id
+	muni_Assault,  // how much packets is available for the assault class?
+	muni_Heavy,     // how much packets is available for the assault class?
+	muni_Sniper,    // how much packets is available for the assault class?
+	Float:muni_PosX,
+	Float:muni_PosY,
+	Float:muni_PosZ,
+	Float:muni_RotX,
+	Float:muni_RotY,
+	Float:muni_RotZ,
+	Text3D:mBox_3dTextLabel,
+	m_teamID,
+	m_boxactive, // is box valid or active
+	bool:m_nearSpawn, // is box near the team spawn (range ~70m)
+	bool:m_isHolded,  // is box being carried by a player
+	m_inBoat,
+	weaponResources_chest[3] // 0 = Aussalt, 1 = Heavy, 2 = Sniper
+	
+	
+}
+
+new MunitionBox[10][MunitonBoxSystem];
+
 public OnGameModeInit()
 {
     maximumPlayerPool = 1000;
+    
 	new hour,minute,second;
 	gettime(hour,minute,second);
 	FixHour(hour);
@@ -479,7 +522,7 @@ public OnGameModeInit()
 	updater = SetTimer("UpdateGameMode",1000,1);
 	SetTimer("CheckAirWinners",2500,1);
 	
-	SetTimer("UpdateObjects",120,1);
+	SetTimer("UpdateObjects",250,1);
 	
 	
 	SetTimer("LoopThrewAllPlayers",1000,1);
@@ -519,6 +562,18 @@ public OnGameModeInit()
 	    ServerCar[i][v_dbid]=-1;
 	    ServerCar[i][v_3dtextlabel]=Text3D:INVALID_3DTEXT_ID;
 	    ServerCar[i][v_function]=0;
+	}
+	
+	
+	for(new i=0; i<sizeof(MunitionBox); i++)
+	{
+ 		MunitionBox[i][muni_id]=-1;
+		MunitionBox[i][mBox_3dTextLabel]=Text3D:-1;
+		MunitionBox[i][m_isHolded]=false;
+		
+		MunitionBox[i][m_inBoat]=-1;
+		
+
 	}
 // Soldier Class 
 	AddPlayerClass(12,-65.4287,-1359.8640,12.4613,69.6762,0,0,0,0,0,0);
@@ -564,6 +619,7 @@ public OnGameModeInit()
 	LoadGangZones();
  	LoadArtillerys();
  	LoadServerCars();
+ 	LoadMunitionBoxes();
 
 	
 
@@ -618,7 +674,7 @@ public OnGameModeInit()
 	{
 		LastDriver[i] = INVALID_PLAYER_ID;
 		
-		VehicleInfo[i][bombs] = 100;
+		VehicleInfo[i][bombs] = 8;
 	}
 	
 
@@ -744,7 +800,7 @@ public OnPlayerConnect(playerid)
     
     ResetPlayerVariables(playerid);
     
-    
+    Streamer_ToggleIdleUpdate(playerid,true); // needs adjustment, if the players is AFK = disabled! /This is a feature in the streamer plugin that updates the items only if the player moves. This is to save some performance but has the side effect that moving objects don't stream in while players are idle.
     if(GetPlayerPoolSize()+1 > maximumPlayerPool)  // can be abused, need trusted admins. Or something else hahaha. ok.
     {
         SCM(playerid,COOLRED,"[SERVER-KICK] You've been kicked, because the maximum Player Amount has been reached.");
@@ -799,6 +855,8 @@ public OnPlayerConnect(playerid)
 	PlayerTextDrawFont(playerid, BombsTextDraw[playerid], 2);
 	PlayerTextDrawSetProportional(playerid, BombsTextDraw[playerid], 1);
 	PlayerTextDrawSetShadow(playerid, BombsTextDraw[playerid], 0);
+	
+
 	  
 	  
  	//
@@ -902,6 +960,26 @@ public OnPlayerDisconnect(playerid, reason)
 {
     SaveUserStats(playerid);
  //   PlayerInfo[playeri][
+ 
+ 
+    new m_id = PlayerInfo[playerid][pHoldingObject];
+	if(PlayerInfo[playerid][pHoldingObject] != -1)
+	{
+	    RemovePlayerAttachedObject(playerid, 9);
+	    MunitionBox[m_id][m_isHolded] = false;
+	    new Float:xc, Float:yc, Float:zc;
+	    GetPlayerPos(playerid, xc, yc, zc);
+	    MunitionBox[m_id][muni_PosX] =xc;
+	    MunitionBox[m_id][muni_PosY] =yc;
+	    MunitionBox[m_id][muni_PosZ] =zc;
+	    MunitionBox[m_id][muni_LocalID] = CreateDynamicObject(2323,MunitionBox[m_id][muni_PosX],MunitionBox[m_id][muni_PosY],MunitionBox[m_id][muni_PosZ]-1,MunitionBox[m_id][muni_RotX],MunitionBox[m_id][muni_RotY],MunitionBox[m_id][muni_RotZ]);
+	    PlayerInfo[playerid][pHoldingObject]=-1;
+	    if(GetPlayerSpecialAction(playerid)==SPECIAL_ACTION_CARRY)
+	    {
+	        SetPlayerSpecialAction(playerid,SPECIAL_ACTION_NONE);
+	    }
+	    updateMunitionBox(m_id);
+	}
 	return 1;
 }
 
@@ -967,7 +1045,7 @@ public OnPlayerSpawn(playerid)
 	            SetPlayerTeam(playerid,rand);
 			}
 			new string[64],team = GetPlayerTeam(playerid);
-			format(string,sizeof(string),"You joined the Team %s",GetTeamName(team));
+			format(string,sizeof(string),"[TEAM-AUTOSELECTION] You joined the Team %s",GetTeamName(team));
 			SendClientMessage(playerid,COLOR_GOLD,string);
 			if(Server[LandGefecht]==true)
 			{
@@ -1026,11 +1104,6 @@ public OnPlayerSpawn(playerid)
 		    {
 		        SetSpawnReady(playerid);
 		        ResetPlayerWeapons(playerid);
-				GivePlayerWeapon(playerid,4,1);
-				GivePlayerWeapon(playerid,24,999);
-				GivePlayerWeapon(playerid,25,999);
-				GivePlayerWeapon(playerid,31,999);
-				GivePlayerWeapon(playerid,34,10);
 				new string[356];
 				format(string,sizeof(string),"{FFFFFF}Class\t{FFFFFF}Points needed\t{FFFFFF}Can select\n{FFFFFF}Assault\t{31B404}[0]\t{31B404}Yes\n{FFFFFF}Heavy\t{31B404}[0]\t{31B404}Yes\n{FFFFFF}Sniper\t{31B404}[0]\t{31B404}Yes\n{FFFFFF}Select Hero[...]\t{31B404}[2.000-6.000]\t{31B404}%s",((PlayerInfo[playerid][gamePoints]<2000)?("{FF0000}No"):("{31B404}Yes")));
 				ShowPlayerDialog(playerid, DIALOG_CHOOSE_CLASS, DIALOG_STYLE_TABLIST_HEADERS, "{FFFFFF}Choose your {31B404}Class:",string,"Select", "");
@@ -1948,6 +2021,7 @@ public OnPlayerStateChange(playerid, newstate, oldstate)
 		if(GetVehicleModel(veh) == 476)
 		{
 		    ShowPlayerBox(playerid,"Use SPACE to drop one Bomb. Press ALT to drop a bunch of bombs.",5);
+		    PlayerTextDrawShow(playerid,BombsTextDraw[playerid]);
 		}
 	}
 	if(newstate & PLAYER_STATE_ONFOOT)
@@ -1956,6 +2030,9 @@ public OnPlayerStateChange(playerid, newstate, oldstate)
 		DeletePVar(playerid,"DroppingFrom");
 
 		DeletePVar(playerid,"DropTime");
+		
+		
+		PlayerTextDrawHide(playerid,BombsTextDraw[playerid]);
 	}
 	/*
 	if(oldstate == PLAYER_STATE_DRIVER && newstate == PLAYER_STATE_ONFOOT)
@@ -2121,6 +2198,98 @@ public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 		        SetPlayerPos(playerid,Artillery[arte_id][Art_PositonX]-1,Artillery[arte_id][Art_PositonY],Artillery[arte_id][Art_PositonZ]);
 			}
 		}
+		if(PlayerInfo[playerid][pHoldingObject] != -1)
+		{
+		    new m_id = PlayerInfo[playerid][pHoldingObject];
+		    new vehid = GetNearestPredator(playerid);
+		    if(vehid == -1)
+		    {
+		       // SCM(playerid,-1,"Debug: Not near a Predator.");
+		        RemovePlayerAttachedObject(playerid, 9);
+		        PlayerInfo[playerid][pHoldingObject]=-1;
+		        MunitionBox[m_id][m_isHolded] = false;
+		        MunitionBox[m_id][m_inBoat] = -1;
+		        
+		        new Float:xc, Float:yc, Float:zc;
+		        GetPlayerPos(playerid, xc, yc, zc);
+		        MunitionBox[m_id][muni_PosX] =xc;
+		        MunitionBox[m_id][muni_PosY] =yc;
+		        MunitionBox[m_id][muni_PosZ] =zc;  // Function for automatically reset if the player stucks in a boat or something (23.06.2020)
+		        MunitionBox[m_id][muni_LocalID] = CreateDynamicObject(2323,MunitionBox[m_id][muni_PosX],MunitionBox[m_id][muni_PosY],MunitionBox[m_id][muni_PosZ]-1,MunitionBox[m_id][muni_RotX],MunitionBox[m_id][muni_RotY],MunitionBox[m_id][muni_RotZ]);
+		        if(GetPlayerSpecialAction(playerid)==SPECIAL_ACTION_CARRY)
+		        {
+		            SetPlayerSpecialAction(playerid,SPECIAL_ACTION_NONE);
+		        }
+		        updateMunitionBox(m_id);
+		    }
+		    else
+		    {
+		     //   SCM(playerid,-1,"Debug: NEAR a Predator.");
+		        
+		        RemovePlayerAttachedObject(playerid, 9);
+		        PlayerInfo[playerid][pHoldingObject]=-1;
+		        MunitionBox[m_id][m_isHolded] = false;
+		        MunitionBox[m_id][m_inBoat] = vehid;
+		        new Float:xc, Float:yc, Float:zc;
+		        GetPlayerPos(playerid, xc, yc, zc);
+		        MunitionBox[m_id][muni_PosX] =xc;
+		        MunitionBox[m_id][muni_PosY] =yc;
+		        MunitionBox[m_id][muni_PosZ] =zc;  // Function for automatically reset if the player stucks in a boat or something (23.06.2020)
+		        MunitionBox[m_id][muni_LocalID] = CreateDynamicObject(2323,MunitionBox[m_id][muni_PosX],MunitionBox[m_id][muni_PosY],MunitionBox[m_id][muni_PosZ]-1,MunitionBox[m_id][muni_RotX],MunitionBox[m_id][muni_RotY],MunitionBox[m_id][muni_RotZ]);
+		        
+		        if(GetPlayerSpecialAction(playerid)==SPECIAL_ACTION_CARRY)
+		        {
+		            SetPlayerSpecialAction(playerid,SPECIAL_ACTION_NONE);
+		        }
+		        updateMunitionBox(m_id);
+      			AttachDynamicObjectToVehicle(MunitionBox[m_id][muni_LocalID], vehid, -0.466968,-4.252247,0.684293,0.000000,0.000000,0.000000);
+		      
+		           // AttachObjectToVehicle(2323,vehicleid,-0.466968,-4.252247,0.684293,0.000000,0.000000,0.000000);
+			}
+		}
+		if(!IsPlayerInAnyVehicle(playerid) && GetPlayerTeam(playerid) != 255)
+		{
+		    if(PlayerInfo[playerid][pHoldingObject]==-1)
+			{
+			    printf("#1st HoldObject: %d",PlayerInfo[playerid][pHoldingObject]);
+			    for(new i=0; i<sizeof(MunitionBox); i++)
+			    {
+				    if(MunitionBox[i][muni_id]!=-1 && MunitionBox[i][m_boxactive])
+				    {
+				        if(MunitionBox[i][m_isHolded]!=true) // so many IFS XDDDDDDDDDDDDDDDDDDDDDDDDDDD
+				        {
+					        if(IsPlayerInRangeOfPoint(playerid,3.5,MunitionBox[i][muni_PosX],MunitionBox[i][muni_PosY],MunitionBox[i][muni_PosZ]) && MunitionBox[i][m_nearSpawn]!=true)
+					        {
+					            //if(GetPlayerSpecialAction(playerid)!=SPECIAL_ACTION_NONE)return SCM(playerid,COOLRED,"[Carry] You can't carry this Object now!");
+								SetPlayerAttachedObject(playerid, 9, 2323, 18, 1.303000, 1.007000, 0.199000, 20.200019, -62.699981, -158.399963, 1.000000, 1.000000, 1.000000);
+								DestroyDynamicObject(MunitionBox[i][muni_LocalID]);
+								PlayerInfo[playerid][pHoldingObject]=i;
+								SetPlayerSpecialAction(playerid,SPECIAL_ACTION_CARRY);
+								MunitionBox[i][m_isHolded] = true;
+								ShowPlayerBox(playerid,"Press ENTER to drop. For deposit, drop it near a predator.",5);
+							    MunitionBox[i][m_teamID] = GetPlayerTeam(playerid);
+							    printf("2#'st HoldObject: %d",PlayerInfo[playerid][pHoldingObject]);
+							    break;
+
+							}
+							else if(MunitionBox[i][m_nearSpawn]==true &&  IsPlayerInRangeOfPoint(playerid,3.5,MunitionBox[i][muni_PosX],MunitionBox[i][muni_PosY],MunitionBox[i][muni_PosZ]))
+							{
+								new playerClassID = GetPlayerClass(playerid);
+								
+								if(IsClassWeaponAvailable(playerClassID,1,i))
+								{
+								    GiveClassWeapons(playerid);
+								}
+							}
+							
+						}
+						
+					}
+				}
+			}
+			
+			
+		}
 	}
 	new dropbombs = GetPVarInt(playerid,"DroppingBombs");
 	if(newkeys & KEY_FIRE && dropbombs == 0)
@@ -2267,6 +2436,19 @@ public OnPlayerTakeDamage(playerid, issuerid, Float:amount, weaponid, bodypart)
     	return 0;
 	}
 	else return 1;
+}
+
+
+public OnPlayerWeaponShot(playerid, weaponid, hittype, hitid, Float:fX, Float:fY, Float:fZ)
+{
+	switch(hitid)
+	{
+	    case BULLET_HIT_TYPE_NONE:
+	    {
+//	        SetPlayerWeaponSkill
+		}
+	}
+	return 1;
 }
 public OnPlayerStreamIn(playerid, forplayerid)
 {
@@ -2420,17 +2602,133 @@ stock GetWeatherName(weatherid) // very accurat
 	}
 	return weatherName;
 }
+stock IsPlayerInRangeOfCar(playerid,car,Float:range)
+{
+	new Float:vehPosX,Float:vehPosY,Float:vehPosZ;
+	GetVehiclePos(car,vehPosX,vehPosY,vehPosZ);
+	if(IsPlayerInRangeOfPoint(playerid,range,vehPosX,vehPosY,vehPosZ)) return 1;
+	return 0;
+}
 
+stock IsPlayerInRangeOfCarTrunk(playerid,car,offset)
+{
+	new Float:vehPosX,Float:vehPosY,Float:vehPosZ;
+	GetPosBehindVehicle(car,vehPosX,vehPosY,vehPosZ,offset);
+	if(IsPlayerInRangeOfPoint(playerid,5.0,vehPosX,vehPosY,vehPosZ)) return 1;
+	return 0;
+}
+
+
+stock GetPosBehindVehicle(vehicleid, &Float:x, &Float:y, &Float:z, Float:offset=0.5) //Credits go to MP2
+{
+    new Float:vehicleSize[3], Float:vehiclePos[3];
+    GetVehiclePos(vehicleid, vehiclePos[0], vehiclePos[1], vehiclePos[2]);
+    GetVehicleModelInfo(GetVehicleModel(vehicleid), VEHICLE_MODEL_INFO_SIZE, vehicleSize[0], vehicleSize[1], vehicleSize[2]);
+    GetXYBehindVehicle(vehicleid, vehiclePos[0], vehiclePos[1], (vehicleSize[1]/2)+offset);
+    x = vehiclePos[0];
+    y = vehiclePos[1];
+    z = vehiclePos[2];
+    return 1;
+}
+
+stock GetXYBehindVehicle(vehicleid, &Float:q, &Float:w, Float:distance)//Credits go to MP2
+{
+    new Float:a;
+    GetVehiclePos(vehicleid, q, w, a);
+    GetVehicleZAngle(vehicleid, a);
+    q += (distance * -floatsin(-a, degrees));
+    w += (distance * -floatcos(-a, degrees));
+}
+
+
+stock GetNearestPredator(playerid)
+{
+	for(new v=0; v<MAX_VEHICLES;v++)
+	{
+		if(v != INVALID_VEHICLE_ID && GetVehicleModel(v) == 430)
+		{
+			if(IsPlayerInRangeOfCar(playerid,v,5.0))
+			{
+		    	return v;
+			}
+		}
+	}
+	return -1;
+}
 stock IsValidArtillery(_artid)
 {
 	if(_artid == -1) return 0;
 	if(Artillery[_artid][artid] == -1) return 0;
 	return 1;
 }
+
+
+/*
+	resource_Assualt,
+	resource_Heavy,
+	resource_Sniper,
+	resource_Agent
+
+*/
+stock IsClassWeaponAvailable(classid,getFromWho,id)
+{
+	switch(getFromWho)
+	{
+	    case 0: // get from a Truck
+	    {
+	        if(VehicleInfo[id][weaponResources][classid] <=0)return 0;
+		}
+		case 1: //get from a supply chest
+		{
+		    if(MunitionBox[id][weaponResources_chest][classid] <=0)return 0;
+		}
+		default:
+		{
+		    return 0;
+		}
+	}
+	return 1;
+}
+stock GiveClassWeapons(playerid) //if weapons available
+{
+	new classid = GetPlayerClass(playerid);
+	switch(classid)
+	{
+	    case 0: //Asault
+	    {
+	        GivePlayerWeapon(playerid,4,1);
+	        GivePlayerWeapon(playerid,24,50);
+			GivePlayerWeapon(playerid,33,120);
+		}
+		case 1: //Heady
+		{
+		    GivePlayerWeapon(playerid,5,1);
+		    GivePlayerWeapon(playerid,22,45);
+		    GivePlayerWeapon(playerid,25,120);
+		}
+		case 2: //Sniper
+		{
+		    GivePlayerWeapon(playerid,2,1);
+		    GivePlayerWeapon(playerid,22,125);
+		    GivePlayerWeapon(playerid,18,3);
+		    GivePlayerWeapon(playerid,34,5);
+		}
+	}
+}
 public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 {
 	switch(dialogid)
 	{
+	    case DIALOG_CHOOSE_CLASS:
+	    {
+	        if(!response)return 0;
+
+			SetPlayerClass(playerid,listitem);
+		///		strcat(sstring,"[CLASS-SELECTION] You selected the %s Class",GetClassName(listitem)));
+			SendFormMessage(playerid,COLOR_GREEN,"{04B431}[CLASS-SELECTION] You selected the {FFFF00}%s {04B431}Class",GetClassName(listitem));
+			ResetPlayerWeapons(playerid);
+			GiveClassWeapons(playerid);
+		}
 	    case DIALOG_ADMIN_CONFIG:
 	    {
 	        if(!response) return 0;
@@ -2971,13 +3269,15 @@ public OnUserLogin(playerid)
 		cache_get_value_name_int(0, "deaths", PlayerInfo[playerid][pDeaths]);
 		cache_get_value_name_int(0, "pTutorial", PlayerInfo[playerid][pTutorial]);
 		cache_get_value_name_int(0, "pAdmin", PlayerInfo[playerid][pAdmin]);
+		cache_get_value_name_int(0, "pWeaponSkill", PlayerInfo[playerid][pWeaponSkill]);
+		
 		
 		SetPlayerScore(playerid,PlayerInfo[playerid][pScore]);
 		PlayerInfo[playerid][pLoggedIn]  = 1;
 		SendClientMessage(playerid, 0x00FF00FF, "[Account] You logged in.");
 		ResetPlayerMoney(playerid);
 		GivePlayerMoney(playerid, PlayerInfo[playerid][pMoney]);
-		
+		SetPlayerWeaponSkill(playerid,PlayerInfo[playerid][pWeaponSkill]);
 		
 		//SpawnPlayer(playerid);
 	}
@@ -3020,8 +3320,8 @@ stock SaveUserStats(playerid)
 
 	//Ansonsten speichere sie
 	new query[256];
-	mysql_format(handle, query, sizeof(query), "UPDATE accountsy SET score = '%d', money = '%d', kills = '%d', deaths = '%d',pTutorial = '%d', pAdmin='%d' WHERE name = '%s'",
-		PlayerInfo[playerid][pScore], PlayerInfo[playerid][pMoney], PlayerInfo[playerid][pKills], PlayerInfo[playerid][pDeaths],PlayerInfo[playerid][pTutorial], PlayerInfo[playerid][pAdmin],PlayerInfo[playerid][pName]);
+	mysql_format(handle, query, sizeof(query), "UPDATE accountsy SET score = '%d', money = '%d', kills = '%d', deaths = '%d',pTutorial = '%d', pAdmin='%d',pWeaponSkill='%d' WHERE name = '%s'",
+		PlayerInfo[playerid][pScore], PlayerInfo[playerid][pMoney], PlayerInfo[playerid][pKills], PlayerInfo[playerid][pDeaths],PlayerInfo[playerid][pTutorial], PlayerInfo[playerid][pAdmin],PlayerInfo[playerid][pWeaponSkill],PlayerInfo[playerid][pName]);
 
 	//Das Query wird abgesendet
 	mysql_pquery(handle, query);
@@ -3060,7 +3360,12 @@ stock ResetPlayerVariables(playerid)
 	PlayerInfo[playerid][findPlaneTimer] = -1;
 	
 	
-	PlayerInfo[playerid][gamePoints] = false;
+	PlayerInfo[playerid][gamePoints] = 0;
+	PlayerInfo[playerid][playerClass] = 0;
+	PlayerInfo[playerid][pHoldingObject] = -1;
+	
+	PlayerInfo[playerid][pWeaponSkill] = 0;
+	
 	
 	
 	
@@ -3803,7 +4108,7 @@ public UpdateGameMode()
 				new teamPlanes = GetAirPlanes(teamid),teamBoats = GetBoats(teamid),teamManPower = GetManPower(teamid),teamTanks = GetTanks(teamid);
 	            new enemyTeam = GetEnemy(teamid);
 				new enemyPlanes = GetAirPlanes(enemyTeam),enemyBoats = GetBoats(enemyTeam),enemyManPower = GetManPower(enemyTeam),enemyTanks = GetTanks(enemyTeam);
-	            new tdstring[32];
+	            new tdstring[32],veh = GetPlayerVehicleID(i);
 	            
 
 				if(teamPlanes >= enemyPlanes)
@@ -3865,17 +4170,73 @@ public UpdateGameMode()
 				    PlayerTextDrawColor(i, Tank_Text[i], COLOR_BLUE);
 				    PlayerTextDrawShow(i,Tank_Text[i]);
 				}
-				
-				
-				
-				
-				
+				if(IsPlayerInAnyVehicle(i))
+				{
+				    if(GetVehicleModel(veh) == 476 && GetVehicleVehicleInfo(i) !=-1)
+				    {
+				        new v_loopid = GetVehicleVehicleInfo(veh);
+				    	format(tdstring, sizeof(tdstring), "BOMBS: %d", VehicleInfo[v_loopid][bombs]);
+			    		PlayerTextDrawSetString(i, BombsTextDraw[i], tdstring);
+					}
+				}
+			}
 
+			for(new m=0; m<sizeof(MunitionBox); m++)
+			{
+			    if(MunitionBox[m][muni_id]!=-1 && PlayerInfo[i][pHoldingObject]==-1)
+			    {
+			        if(IsPlayerInRangeOfPoint(i,3.0,MunitionBox[m][muni_PosX],MunitionBox[m][muni_PosY],MunitionBox[m][muni_PosZ]) && PlayerInfo[i][pBoxShown] != true)
+			        {
+			            if(MunitionBox[m][m_nearSpawn]) // extra variable w unnötig z.B canPickUpWeapons,canPickupBox use m_NearSpawn // teamID not needed anymore I guess
+			            {
+			            	ShowPlayerBox(i,"Press ENTER to get weapons.",5);
+						}
+						else
+						{
+						    ShowPlayerBox(i,"Press ENTER to pickup the box.",5);
+						}
+					}
+				}
 			}
 
 		}
 	}
+	for(new m=0; m<sizeof(MunitionBox); m++)
+	{
+ 		if(MunitionBox[m][muni_id]!=-1)
+   		{
+   		    new teamid = MunitionBox[m][m_teamID]; //randomEx(1,3); m_teamID
+   		    new Float:teamSpawn_X,Float:teamSpawn_Y,Float:teamSpawn_Z;
+   		    GetTeamSpawn(teamid,teamSpawn_X,teamSpawn_Y,teamSpawn_Z);
+     		if(IsPointInRangeOfPoint(MunitionBox[m][muni_PosX],MunitionBox[m][muni_PosY],MunitionBox[m][muni_PosZ],teamSpawn_X,teamSpawn_Y,teamSpawn_Z,70.0) && MunitionBox[m][m_boxactive] != 0)
+       		{
+         		MunitionBox[m][m_nearSpawn] = true;
+			}
+			else
+			{
+			    MunitionBox[m][m_nearSpawn] = false;
+			}
+			
+			if(MunitionBox[m][m_inBoat]!=-1 && MunitionBox[m][muni_LocalID]!=INVALID_OBJECT_ID)
+			{
+			    new Float:Pos_ObjX,Float:Pos_ObjY,Float:Pos_ObjZ,vehid = MunitionBox[m][m_inBoat];
+			    
+		//	    GetObjectAttachmentOffset(MunitionBox[m][muni_LocalID], vehid, Pos_ObjX, Pos_ObjY, Pos_ObjZ, Pos_ObjRotX, Pos_ObjRotY, Pos_ObjRotZ);
+		
+		     //   GetAttachedObjectPos(MunitionBox[m][muni_LocalID], vehid, Pos_ObjX, Pos_ObjY, Pos_ObjZ);
+		     
+		        Streamer_GetFloatData(STREAMER_TYPE_OBJECT, MunitionBox[m][muni_LocalID], E_STREAMER_ATTACH_X, Pos_ObjX);
+				Streamer_GetFloatData(STREAMER_TYPE_OBJECT, MunitionBox[m][muni_LocalID], E_STREAMER_ATTACH_Y, Pos_ObjY);
+				Streamer_GetFloatData(STREAMER_TYPE_OBJECT, MunitionBox[m][muni_LocalID], E_STREAMER_ATTACH_Z, Pos_ObjZ);
 
+			    
+			    MunitionBox[m][muni_PosX]=Pos_ObjX;
+			    MunitionBox[m][muni_PosY]=Pos_ObjY;
+			    MunitionBox[m][muni_PosZ]=Pos_ObjZ;
+			   // printf("Dynamic Object Pos: %f, %f, %f",Pos_ObjX,Pos_ObjY,Pos_ObjZ);
+			}
+		}
+	}
 	if(changeTime > 59)
 	{
 	    if(!timeFreezed)
@@ -3908,6 +4269,54 @@ public UpdateGameMode()
 	}
 	return 1;
 }
+
+stock GetAttachedObjectPos(objectid, vehicleid, &Float: x, &Float: y, &Float: z)
+{
+    if(IsValidDynamicObject(objectid) && GetVehicleModel(vehicleid))
+    {
+            new Float: pos[3], Float: vpos[3];
+            GetDynamicObjectPos(objectid, pos[0], pos[1], pos[2]);
+            GetVehiclePos(vehicleid, vpos[0], vpos[1], vpos[2]);
+
+            x = vpos[0]-pos[0];
+            y = vpos[1]-pos[1];
+            z = vpos[2]-pos[2];
+            return 1;
+    }
+
+    else return 0;
+}
+
+stock GetObjectAttachmentOffset(objectid, vehicleid, &Float:att_x, &Float:att_y, &Float:att_z, &Float:att_rx, &Float:att_ry, &Float:att_rz)
+{
+	new Float:v_x, Float:v_y, Float:v_z, Float:v_rz,
+	Float:o_x, Float:o_y, Float:o_z, Float:o_rx, Float:o_ry, Float:o_rz;
+
+	GetVehiclePos(vehicleid, v_x, v_y, v_z);
+	GetVehicleZAngle(vehicleid, v_rz);
+
+	GetDynamicObjectPos(objectid, o_x, o_y, o_z);
+	GetDynamicObjectRot(objectid, o_rx, o_ry, o_rz);
+
+	new Float:o_distance = VectorSize(v_x - o_x, v_y - o_y, 0.0), // Calculate the X/Y distance from the vehicle to the object so we can place it again in the new direction
+		Float:o_angle = (atan2(o_y - v_y, o_x - v_x) - 90.0) - v_rz; // Get the object's angle relative to the vehicle's angle
+
+	o_x = v_x + o_distance * floatsin(-o_angle, degrees); // Rotate the object position by the difference calculated above (o_angle)
+	o_y = v_y + o_distance * floatcos(-o_angle, degrees);
+
+	o_rz -= v_rz; // Adjust the Z angle of the object to face the original direction (rotate it by the opposite of the vehicle's angle)
+
+	att_x = o_x - v_x;
+	att_y = o_y - v_y;
+	att_z = o_z - v_z;
+
+	att_rx = o_rx;
+	att_ry = o_ry;
+	att_rz = o_rz;
+
+	return 1;
+}
+
 
 stock GetRandomNormaLWeatherID()
 {
@@ -4496,8 +4905,16 @@ stock DropBomb(playerid,art)
 	}
     else
     {
+    
+        if(VehicleInfo[i][bombs]<=0) //empty
+        {
+            //PlayerPlaySound(playerid,1131,0.0,0.0,0.0);
+            PlayerPlaySound(playerid,1027,0.0,0.0,0.0);
+            return 1;
+		}
+		
         new dropbombs = GetPVarInt(playerid,"DroppingBombs");
-	
+	    VehicleInfo[i][bombs]--;
 	    dropbombs--;
 	    if(dropbombs <= 0) { dropbombs = 0;}
 	    
@@ -4747,7 +5164,53 @@ stock GetPlayerClassJob(playerid,skinid)
 		return job;
 }*/
 	
-	
+
+
+stock GetPlayerClass(playerid)
+{
+	return PlayerInfo[playerid][playerClass];
+}
+
+stock SetPlayerClass(playerid,classid)
+{
+	PlayerInfo[playerid][playerClass] = classid;
+	return 1;
+}
+
+stock GetClassName(classid)
+{
+	new className[12];
+	switch(classid)
+	{
+	    case 0:
+	    {
+			className = "Assault";
+		}
+		case 1:
+	    {
+			className = "Heavy";
+		}
+		case 2:
+	    {
+			className = "Sniper";
+		}
+		case 3:
+	    {
+			className = "Agent";
+		}
+		case 4:
+	    {
+			className = "Hero";
+		}
+		default:
+		{
+		    className = "Unknown";
+		}
+	}
+	return className;
+}
+
+
 forward HideBox(playerid);
 public HideBox(playerid)
 {
@@ -4804,6 +5267,22 @@ public LoadGangZones2()
 }
 
 
+
+
+updateMunitionBox(id)
+{
+    new text[256];
+    format(text,sizeof(text), "Munition-Box\nID: %d\nPress ENTER to get your munition-package" ,id);
+	if(MunitionBox[id][mBox_3dTextLabel] != Text3D:-1)
+	{
+	    UpdateDynamic3DTextLabelText(MunitionBox[id][mBox_3dTextLabel], COLOR_GREY, text);
+	}
+	else
+	{
+	    MunitionBox[id][mBox_3dTextLabel] = CreateDynamic3DTextLabel(text, COLOR_GREY, MunitionBox[id][muni_PosX],MunitionBox[id][muni_PosY],MunitionBox[id][muni_PosZ], 10.0);
+	}
+	return 1;
+}
 
 updateArtillery(id)
 {
@@ -5007,14 +5486,107 @@ public LoadServerCarsNow()
 	 // richtig ? i thin schon
 }
 
+/*
+enum MunitonBoxSystem{
+
+	muni_id,
+	muni_LocalID,   // Object id
+	muni_Assault,  // how much packets is available for the assault class?
+	muni_Heavy,     // how much packets is available for the assault class?
+	muni_Sniper,    // how much packets is available for the assault class?
+	Float:muni_PosX,
+	Float:muni_PosY,
+	Float:muni_PosZ,
+	Float:muni_RotX,
+	Float:muni_RotY,
+	Float:muni_RotZ,
+
+
+}
+
+new MunitionBox[10][MunitonBoxSystem];
+
+/*/
+
+
+
+forward LoadMunitionBoxes();
+public LoadMunitionBoxes()
+{
+    new query[128];
+    format(query,sizeof(query),"SELECT * FROM `MunitionBoxes`");
+    mysql_pquery(handle, query, "LoadMunitionBoxes2");
+    return 1;
+}
+
+
+forward LoadMunitionBoxes2();
+public LoadMunitionBoxes2()
+{
+    new rows;
+    cache_get_row_count(rows);
+    new id;
+	if(rows)
+	{
+	    for(new i; i<rows; i++)
+    	{
+    	    new m_id = FindFreeId_MunitionBox();
+
+	        if(m_id == -1) return printf("Couldn't load row %d (MUNITIONBOX), Reason: Limit reached.",i);
+
+	        MunitionBox[m_id][muni_id] = id;
+    	    cache_get_value_name_int(i, "ListID", MunitionBox[m_id][muniListID]);
+    	    
+    	    
+    	    cache_get_value_name_int(i, "m_teamID", MunitionBox[m_id][m_teamID]);
+    	    
+    	    cache_get_value_name_int(i, "m_boxactive", MunitionBox[m_id][m_boxactive]);
+
+            cache_get_value_name_float(i, "muni_PosX", MunitionBox[m_id][muni_PosX]);
+	     	cache_get_value_name_float(i, "muni_PosY", MunitionBox[m_id][muni_PosY]);
+	     	cache_get_value_name_float(i, "muni_PosZ", MunitionBox[m_id][muni_PosZ]);
+
+	     	cache_get_value_name_float(i, "muni_RotX", MunitionBox[m_id][muni_RotX]);
+	     	cache_get_value_name_float(i, "muni_RotY", MunitionBox[m_id][muni_RotY]);
+	     	cache_get_value_name_float(i, "muni_RotZ", MunitionBox[m_id][muni_RotZ]);
+	     	
+	     	
+	     	
+     	 	cache_get_value_name_int(i, "muni_Assault", MunitionBox[m_id][weaponResources_chest][0]);
+    	    cache_get_value_name_int(i, "muni_Heavy", MunitionBox[m_id][weaponResources_chest][1]);
+    	    cache_get_value_name_int(i, "muni_Sniper", MunitionBox[m_id][weaponResources_chest][2]);
+	     	
+
+
+			if(MunitionBox[m_id][m_boxactive])
+			{
+	     		MunitionBox[m_id][muni_LocalID] = CreateDynamicObject(2323,MunitionBox[m_id][muni_PosX],MunitionBox[m_id][muni_PosY],MunitionBox[m_id][muni_PosZ]-1,MunitionBox[m_id][muni_RotX],MunitionBox[m_id][muni_RotY],MunitionBox[m_id][muni_RotZ]);
+	     		updateMunitionBox(m_id);
+			}
+		}
+		return 1;
+	}
+	printf("Munition Boxes loaded: %d", rows);
+	return 1;
+}
+
+
+stock FindFreeId_MunitionBox()
+{
+    for(new i=0; i<sizeof(MunitionBox); i++)
+	{
+	   if(MunitionBox[i][muni_id]==-1) return i;
+	}
+	print("Error: Maximum capicity of servercars reached.");
+	return -1;
+}
 getFreeVID()
 {
 	for(new i=0; i<sizeof(ServerCar); i++)
 	{
 	   if(ServerCar[i][v_dbid]==-1) return i;
 	}
-	print("Error: Maximale Anzahl an Server Autos erreicht.");
-
+	print("Error: Maximum capicity of servercars reached.");
 	return -1;
 }
 stock SetCarAttachments(idx)
@@ -5252,6 +5824,28 @@ stock SetObjectFaceCoords3D(iObject, Float: fX, Float: fY, Float: fZ, Float: fRo
     SetDynamicObjectRot(iObject, fRollOffset, fPitch + fPitchOffset, fZ + fYawOffset);
 }
 
+
+stock GetTeamSpawn(teamid,&Float:t_PositionX,&Float:t_PositionY,&Float:t_PositionZ)
+{
+//	new Float:t_PosX,Float:t_PosY,Float:t_PosZ;
+    switch(teamid)
+    {
+        case 1:
+        {
+            t_PositionX=274.0078;
+            t_PositionY=-1827.9856;
+            t_PositionZ=3.8590;
+        }
+        case 2:
+        {
+            t_PositionX=-376.8274;
+            t_PositionY=-1411.9464;
+            t_PositionZ=25.7266;
+        }
+    }
+}
+	
+	
 //OCMD COMMANDS
 
 ocmd:stats(playerid,params[])
@@ -5327,7 +5921,7 @@ ocmd:rotation(playerid,params[])
 
 ocmd:testoommand(playerid,params[])   // can be changed everytime ( DEBUG COMMAND TO TEST ARTILLERY TARGET )
 {
-    SetPlayerCamera(playerid, 1);
+    printf("CMD#'st HoldObject: %d",PlayerInfo[playerid][pHoldingObject]);
     return 1;
 }
 ocmd:testoommand2(playerid,params[])   // can be changed everytime ( DEBUG COMMAND TO TEST ARTILLERY TARGET )
@@ -5551,12 +6145,90 @@ ocmd:deletecar(playerid,params[])
 }
 
 
+stock GetWeaponSkillName(level)
+{
+	new skillName[12];
+	switch(level)
+	{
+	    case 0:
+	    {
+	        skillName = "Poor";
+		}
+		case 40..998:
+	    {
+            skillName = "Gangster";
+		}
+		case 999:
+	    {
+            skillName = "Hitman";
+		}
+		default:
+		{
+		    skillName = "Unknown";
+		}
+	}
+	return skillName;
+}
 
+stock GetPlayerWeaponSkill(playerid)
+{
+	return PlayerInfo[playerid][pWeaponSkill];
+}
 
-
-
-
-
+stock SetPlayerWeaponSkill(playerid,level)
+{
+	new skill = level,string[176];
+	switch(level)
+	{
+	    /*
+	    case 0: //Poor, will never be displayed but I'll let it in
+	    {
+	        skill = 0;
+	        format(string,sizeof(string),"Weapon Skill - Upgraded.  Keep practicing and you'll reach %s level.",GetWeaponSkillName(level+1));
+		}*/
+		case 40..998: //gangstA
+		{
+            format(string,sizeof(string),"Weapon Skill - Upgraded.  Keep practicing and you'll reach Hitman level.", 1);
+		}
+		case 999: // Hitman
+		{
+		    format(string,sizeof(string),"Weapon Skill - Upgraded. Hitman level reached. You can now fire while moving. Lock-on range, accuracy and strafe speed have all increaed.",1 );
+		}
+	}
+	if(level < GetPlayerWeaponSkill(playerid))
+	{
+	    format(string,sizeof(string),"Weapon Skill - Decreased. You're now a %s Not training shooting is like not training muscels.", GetWeaponSkillName(GetPlayerWeaponSkill(playerid)));
+	}
+	
+	ShowPlayerBox(playerid,string,7);
+	// if there is a system for every single weapon in the future, players should be able to reset they skill, because all players who had reached Hitman before will stay Hitman at all weapons.
+	SetPlayerSkillLevel(playerid,WEAPONSKILL_PISTOL,skill);
+	
+	SetPlayerSkillLevel(playerid,WEAPONSKILL_PISTOL_SILENCED,skill);
+	
+	SetPlayerSkillLevel(playerid,WEAPONSKILL_DESERT_EAGLE,skill);
+	
+	SetPlayerSkillLevel(playerid,WEAPONSKILL_SHOTGUN,skill);
+	
+	SetPlayerSkillLevel(playerid,WEAPONSKILL_SAWNOFF_SHOTGUN,skill);
+	
+	SetPlayerSkillLevel(playerid,WEAPONSKILL_SPAS12_SHOTGUN,skill);
+	
+	SetPlayerSkillLevel(playerid,WEAPONSKILL_MICRO_UZI,skill);
+	
+	SetPlayerSkillLevel(playerid,WEAPONSKILL_MP5,skill);
+	
+	SetPlayerSkillLevel(playerid,WEAPONSKILL_AK47,skill);
+	
+	SetPlayerSkillLevel(playerid,WEAPONSKILL_AK47,skill);
+	
+	SetPlayerSkillLevel(playerid,WEAPONSKILL_M4,skill);
+	
+	SetPlayerSkillLevel(playerid,WEAPONSKILL_SNIPERRIFLE,skill);
+	
+	return 1;
+	
+}
 
 
 
